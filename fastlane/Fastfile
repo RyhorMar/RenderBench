@@ -1,3 +1,12 @@
+# xcodebuild prints its dependency graph with a "\u279c" in every line, and does so whenever the
+# graph has been recomputed — after the project is regenerated, which this lane does every run.
+# Under a C locale xcpretty reads that byte as US-ASCII and dies, `set -o pipefail` turns the dead
+# formatter into a failed build, and the truncated log shows a build that simply stopped. It cost
+# an afternoon to find once. Both variables are needed: Ruby reads LANG, and LC_ALL overrides an
+# LC_CTYPE inherited from the shell.
+ENV["LANG"] = "en_US.UTF-8" if ENV["LANG"].to_s.empty?
+ENV["LC_ALL"] = "en_US.UTF-8" if ENV["LC_ALL"].to_s.empty?
+
 # Lanes are the single definition of "does this build". CI calls the same ones a developer does,
 # so a green pipeline and a green machine cannot mean different things.
 
