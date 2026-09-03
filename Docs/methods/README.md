@@ -15,6 +15,7 @@ what each one costs and where each one lies.
 | [Buffers and windows](buffers-and-windows.md) | mirrored ring buffer, gap runs, carrier search | partly |
 | [Frame pipeline](frame-pipeline.md) | one clock per scene, one-deep slot, epochs | no |
 | [Colour](colour.md) | linear sRGB, categorical palette | yes |
+| [Equivalence](equivalence.md) | per-channel difference, PSNR, offscreen reference | no |
 
 ## What each page contains
 
@@ -32,7 +33,7 @@ Every page follows the same eight sections, in this order:
 ## Two rules
 
 **Provenance is never omitted.** Where no authoritative source exists, section 5 says so and lists
-what was consulted and why it does not qualify. Three methods here are engineering folklore with no
+what was consulted and why it does not qualify. Four of these methods rest on conventions with no
 citable origin, and each says as much on its own page. A method presented without provenance reads
 as one whose provenance nobody checked.
 

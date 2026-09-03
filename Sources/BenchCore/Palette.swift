@@ -15,6 +15,24 @@ public struct PaletteColor: Sendable, Hashable {
         self.blue = blue
     }
 
+    /// The same components gamma-encoded back into sRGB.
+    ///
+    /// Needed wherever a colour crosses into an API that expects encoded values — `CGColor` and
+    /// most platform colour types do. Passing linear components to one of those darkens every
+    /// colour, which is visible rather than subtle: it was how the first offscreen reference image
+    /// came out looking nothing like the same chart on screen.
+    public var encodedSRGB: (red: Double, green: Double, blue: Double) {
+        (Self.encode(red), Self.encode(green), Self.encode(blue))
+    }
+
+    /// Inverse of the transfer function in ``init(srgb:_:_:)``, to the same standard.
+    static func encode(_ linear: Double) -> Double {
+        let clamped = min(max(linear, 0), 1)
+        return clamped <= 0.003_130_8
+            ? clamped * 12.92
+            : 1.055 * pow(clamped, 1 / 2.4) - 0.055
+    }
+
     /// Builds a colour from an 8-bit gamma-encoded sRGB triple, converting to linear.
     public init(srgb red: Int, _ green: Int, _ blue: Int) {
         func linear(_ channel: Int) -> Double {

@@ -96,7 +96,17 @@ func discoverTargetDirectories(under roots: [String]) -> [String] {
         let holdsSwiftDirectly = entries.contains { $0.hasSuffix(".swift") }
 
         if holdsSwiftDirectly { found.append(rootName) }
-        found.append(contentsOf: subdirectories.map { "\(rootName)/\($0)" })
+        // Only directories that actually hold sources need a layering rule. Demanding one for a
+        // folder of reference images made the check fail on a directory it has nothing to say
+        // about — the rule exists to catch an undeclared target, not an undeclared folder.
+        found.append(contentsOf: subdirectories.compactMap { name in
+            let path = rootURL.appendingPathComponent(name).path
+            guard let walker = fileManager.enumerator(atPath: path) else { return nil }
+            for case let entry as String in walker where entry.hasSuffix(".swift") {
+                return "\(rootName)/\(name)"
+            }
+            return nil
+        })
     }
     return found.sorted()
 }

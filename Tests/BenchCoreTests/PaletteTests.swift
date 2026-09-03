@@ -108,3 +108,29 @@ func negativeIndicesAreSafe() {
     #expect(Palette.colour(forSeries: -8, dark: false) == Palette.colour(forSeries: 0, dark: false))
     #expect(Palette.colour(forSeries: -9, dark: true) == Palette.colour(forSeries: 7, dark: true))
 }
+
+/// The inverse transfer function, needed wherever a colour crosses into an API that expects
+/// encoded components. Anchored to the same standard points, from the other side.
+@Test
+func linearToEncodedMatchesTheStandardAtKnownPoints() {
+    #expect(PaletteColor.encode(0) == 0)
+    #expect(abs(PaletteColor.encode(1) - 1) < 1e-12)
+    #expect(abs(PaletteColor.encode(0.2158) - 0.5019) < 0.0005)
+}
+
+/// Round trip over every 8-bit level. A transfer function whose inverse is wrong shows as colours
+/// that are consistently too dark, which is easy to miss in code and obvious in an image.
+@Test
+func encodingRoundTripsThroughEveryLevel() {
+    for channel in 0...255 {
+        let colour = PaletteColor(srgb: channel, channel, channel)
+        let back = PaletteColor.encode(colour.red) * 255
+        #expect(abs(back - Double(channel)) < 0.51, "level \(channel) came back as \(back)")
+    }
+}
+
+@Test
+func encodingClampsRatherThanProducingNonsense() {
+    #expect(PaletteColor.encode(-1) == 0)
+    #expect(abs(PaletteColor.encode(2) - 1) < 1e-12)
+}
