@@ -78,28 +78,29 @@ public struct CanvasChartView: View {
                 context.stroke(stroke.path, with: .color(colour(stroke.colour)), style: style)
             }
 
+            // Resolved once each, then drawn. Text layout every frame is inherent to an
+            // immediate-mode backend — there is nowhere to keep a laid-out run between frames —
+            // so it is part of this method's cost rather than a defect in it. Worth knowing when
+            // reading the numbers: the offscreen reference draws no text, so a comparison against
+            // a stored image omits work the measured frame did.
             for tick in frame.yTicks {
                 let y = plot.maxY - CGFloat(tick.position) * plot.height
-                context.draw(
-                    label(tick.label),
-                    at: CGPoint(x: plot.minX - 6, y: y),
-                    anchor: .trailing
-                )
+                let resolved = context.resolve(label(tick.label))
+                context.draw(resolved, at: CGPoint(x: plot.minX - 6, y: y), anchor: .trailing)
             }
             for tick in frame.xTicks {
                 let x = plot.minX + CGFloat(tick.position) * plot.width
-                context.draw(
-                    label(tick.label),
-                    at: CGPoint(x: x, y: plot.maxY + 10),
-                    anchor: .center
-                )
+                let resolved = context.resolve(label(tick.label))
+                context.draw(resolved, at: CGPoint(x: x, y: plot.maxY + 10), anchor: .center)
             }
     }
 
+    /// Hoisted: rebuilding the descriptor per tick per frame allocated for a value that never
+    /// varies.
+    private static let labelFont = Font.system(size: 9, design: .monospaced)
+
     private func label(_ text: String) -> Text {
-        Text(text)
-            .font(.system(size: 9, design: .monospaced))
-            .foregroundStyle(colour(chrome.label))
+        Text(text).font(Self.labelFont).foregroundStyle(colour(chrome.label))
     }
 
     private func colour(_ palette: PaletteColor) -> Color {

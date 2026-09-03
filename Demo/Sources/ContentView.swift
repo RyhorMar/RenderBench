@@ -113,11 +113,25 @@ private struct ChartPane: View {
     let scene: ChartScene
 
     var body: some View {
-        CanvasChartView(frame: scene.frame, recorder: scene.rasterTime)
-            .overlay(alignment: .topTrailing) { HUDView(scene: scene).padding(8) }
+        // The clip and the border are on the frame, not on the chart. Reading the per-frame
+        // geometry inside a body that also carries a rounded mask and a stroked overlay made the
+        // compositor redo both at frame rate, and charged them to the same main-thread frame the
+        // measurement is about.
+        ChartSurface(scene: scene)
             .onGeometryChange(for: CGSize.self) { $0.size } action: { scene.chartSize = $0 }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .clipShape(RoundedRectangle(cornerRadius: 10))
             .overlay(RoundedRectangle(cornerRadius: 10).stroke(.quaternary))
+    }
+}
+
+/// The only view that reads the per-frame geometry, and therefore the only one re-evaluated at
+/// frame rate.
+private struct ChartSurface: View {
+    let scene: ChartScene
+
+    var body: some View {
+        CanvasChartView(frame: scene.frame, recorder: scene.rasterTime)
+            .overlay(alignment: .topTrailing) { HUDView(scene: scene).padding(8) }
     }
 }
