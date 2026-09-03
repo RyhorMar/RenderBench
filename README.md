@@ -3,13 +3,24 @@
 Nine ways to draw the same realtime chart on iOS, on the same data, with measured frame time
 and a documented failure point for each.
 
-**Status: one backend of nine.** The Canvas backend draws a live strip chart from a running
-window, with min/max and LTTB selectable at runtime and an overlay reporting frame-time
-percentiles. The other eight backends, Metal, accessibility and the oil & gas chart types are not
-written yet.
+**Status: three backends of nine, and no measurement on a device yet.** Canvas draws a live strip
+chart from a running window, with min/max and LTTB selectable at runtime and an overlay reporting
+frame-time percentiles. Core Animation draws the same frame as a layer tree. Metal uploads the
+points once and expands them into triangles in a vertex shader, and is the only one of the three
+whose rasterisation is measured rather than inferred: a command buffer carries its own timestamps.
+
+The three agree on what they draw, checked on every test run — but agreement is a weaker claim for
+the first two, which share a rasteriser, than for the third, which does not. See
+[`Docs/methods/equivalence.md`](Docs/methods/equivalence.md).
+
+The central claim of this project — that these methods differ in measurable ways — **is not yet
+supported by a single measurement on hardware.** `Benchmarks/results/` is empty on purpose: the
+guard in `fastlane bench_guard` rejects a run made in a simulator, in Debug, or on a thermally
+throttled device, and no run has been made that passes it. The remaining six backends,
+accessibility and the oil & gas chart types are not written.
 
 ```
-swift test          # the package: 85 tests
+swift test          # the package: 215 tests
 fastlane ci         # package, tests, layering rule, demo build
 fastlane run_demo   # build, install and launch on a booted simulator
 ```
