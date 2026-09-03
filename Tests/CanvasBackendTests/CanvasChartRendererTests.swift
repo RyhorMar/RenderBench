@@ -115,10 +115,12 @@ func aRefusedSeriesIsReportedRatherThanSilentlyBlank() {
 @Test
 func plotRectLeavesRoomForLabelsOnTwoSides() {
     let frame = build(provider())
-    #expect(frame.plotRect.minX == CanvasChartRenderer.leftInset)
-    #expect(frame.plotRect.minY == CanvasChartRenderer.topInset)
-    #expect(frame.plotRect.maxX == size.width - CanvasChartRenderer.rightInset)
-    #expect(frame.plotRect.maxY == size.height - CanvasChartRenderer.bottomInset)
+    // Explicit conversion on both sides: the frame carries CGFloat and the shared insets are
+    // Double, and the implicit bridge between them does not survive the expectation macro.
+    #expect(Double(frame.plotRect.minX) == FramePreparation.leftInset)
+    #expect(Double(frame.plotRect.minY) == FramePreparation.topInset)
+    #expect(Double(frame.plotRect.maxX) == Double(size.width) - FramePreparation.rightInset)
+    #expect(Double(frame.plotRect.maxY) == Double(size.height) - FramePreparation.bottomInset)
 }
 
 @Test

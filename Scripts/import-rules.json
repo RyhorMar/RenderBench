@@ -133,6 +133,7 @@
       ],
       "local": [
         "BenchCore",
+        "BenchScales",
         "BenchDownsampling",
         "BenchRuntime",
         "BenchTestSupport"
@@ -161,6 +162,36 @@
         "BenchRuntime",
         "BenchTestSupport",
         "CanvasBackend"
+      ]
+    },
+    "Sources/CoreAnimationBackend": {
+      "system": [
+        "Foundation",
+        "QuartzCore",
+        "CoreGraphics"
+      ],
+      "local": [
+        "BenchCore",
+        "BenchScales",
+        "BenchDownsampling",
+        "BenchRuntime"
+      ]
+    },
+    "Tests/CoreAnimationBackendTests": {
+      "system": [
+        "Foundation",
+        "Testing",
+        "CoreGraphics",
+        "QuartzCore"
+      ],
+      "local": [
+        "BenchCore",
+        "BenchScales",
+        "BenchDownsampling",
+        "BenchRuntime",
+        "BenchTestSupport",
+        "CanvasBackend",
+        "CoreAnimationBackend"
       ]
     }
   }

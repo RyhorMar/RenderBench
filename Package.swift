@@ -38,6 +38,7 @@ let package = Package(
         .library(name: "BenchRuntime", targets: ["BenchRuntime"]),
         .library(name: "BenchTestSupport", targets: ["BenchTestSupport"]),
         .library(name: "CanvasBackend", targets: ["CanvasBackend"]),
+        .library(name: "CoreAnimationBackend", targets: ["CoreAnimationBackend"]),
     ],
     targets: [
         // MARK: Layers
@@ -91,6 +92,19 @@ let package = Package(
             swiftSettings: strictMainActor
         ),
 
+        // Second of the nine. Retained geometry: one shape layer per series, paths rebuilt each
+        // frame. It does not own a display link — the scene's clock is shared, or the two
+        // backends would be timed on different work.
+        // Not main-actor by default, unlike the Canvas backend: `CALayer` declares its
+        // initialisers outside any actor, so a subclass cannot isolate them. The layer inherits
+        // CALayer's own contract — use it from the main thread — which the compiler does not
+        // express either way.
+        .target(
+            name: "CoreAnimationBackend",
+            dependencies: ["BenchRuntime"],
+            swiftSettings: strict
+        ),
+
         // MARK: Tooling
 
         // The dependency rule is machine-checked because nothing else enforces it: SwiftPM does
@@ -138,6 +152,11 @@ let package = Package(
         .testTarget(
             name: "CanvasBackendTests",
             dependencies: ["CanvasBackend", "BenchTestSupport"],
+            swiftSettings: strictMainActor
+        ),
+        .testTarget(
+            name: "CoreAnimationBackendTests",
+            dependencies: ["CoreAnimationBackend", "CanvasBackend", "BenchTestSupport"],
             swiftSettings: strictMainActor
         ),
     ]
