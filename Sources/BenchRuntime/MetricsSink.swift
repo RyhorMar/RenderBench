@@ -1,0 +1,128 @@
+import Synchronization
+
+/// Percentiles over a window of frames.
+public struct FrameStatistics: Sendable, Equatable {
+    /// Frames the summary was computed over.
+    public let sampleCount: Int
+    /// Nanoseconds.
+    public let p50Ns: UInt64
+    public let p95Ns: UInt64
+    public let p99Ns: UInt64
+    public let maxNs: UInt64
+
+    public init(sampleCount: Int, p50Ns: UInt64, p95Ns: UInt64, p99Ns: UInt64, maxNs: UInt64) {
+        self.sampleCount = sampleCount
+        self.p50Ns = p50Ns
+        self.p95Ns = p95Ns
+        self.p99Ns = p99Ns
+        self.maxNs = maxNs
+    }
+}
+
+/// Collects per-frame records and is the only place percentiles are computed.
+///
+/// Both the on-screen overlay and the benchmark runner read from here and neither calculates
+/// anything of its own. Two implementations of "p95" disagreeing by a rounding rule is not a
+/// hypothetical: it is how a HUD ends up contradicting the results file it was supposed to
+/// illustrate.
+///
+/// Percentiles use nearest-rank — the smallest value at or below which at least *p* percent of
+/// observations fall, with no interpolation. Stated because the alternatives differ by a whole
+/// frame on a hundred-sample window, and a table that does not say which it used cannot be
+/// compared with anything.
+public final class MetricsSink: Sendable {
+    private struct Storage {
+        var frames: [FrameMetrics]
+        var head: Int
+        var count: Int
+    }
+
+    /// Frames retained. Older records are overwritten.
+    public let capacity: Int
+    private let storage: Mutex<Storage>
+
+    /// - Parameter capacity: Frames kept. The default holds twenty seconds at 120 Hz, which is
+    ///   long enough to cover a benchmark case and short enough that a thermal shift partway
+    ///   through shows up as a change rather than being averaged away.
+    public init(capacity: Int = 2_400) {
+        precondition(capacity > 0, "MetricsSink needs a positive capacity")
+        self.capacity = capacity
+        self.storage = Mutex(Storage(frames: [], head: 0, count: 0))
+    }
+
+    /// Records one frame.
+    ///
+    /// - Complexity: O(1) amortised. Safe to call from the frame tick.
+    public func record(_ metrics: FrameMetrics) {
+        storage.withLock { state in
+            if state.frames.count < capacity {
+                state.frames.append(metrics)
+            } else {
+                state.frames[state.head] = metrics
+            }
+            state.head = (state.head + 1) % capacity
+            state.count = Swift.min(state.count + 1, capacity)
+        }
+    }
+
+    /// Frames currently retained.
+    public var count: Int { storage.withLock { $0.count } }
+
+    /// Every retained record, oldest first.
+    public func snapshot() -> [FrameMetrics] {
+        storage.withLock { state in
+            guard state.count == capacity else { return state.frames }
+            return Array(state.frames[state.head...]) + Array(state.frames[..<state.head])
+        }
+    }
+
+    /// Percentiles of total CPU frame time.
+    public func cpuStatistics() -> FrameStatistics? {
+        statistics(of: snapshot().map(\.cpuTotalNs))
+    }
+
+    /// Percentiles of GPU frame time, over the frames that reported one.
+    ///
+    /// Returns `nil` when no frame reported GPU time rather than zero: a CPU backend has no GPU
+    /// interval, and a zero here would win every comparison it appears in.
+    public func gpuStatistics() -> FrameStatistics? {
+        statistics(of: snapshot().compactMap(\.gpuNs))
+    }
+
+    /// Share of retained frames that missed their deadline, over the frames that could tell.
+    ///
+    /// `nil` when no frame reported a presentation time.
+    public func missedDeadlineRatio(frameBudgetSeconds: Double) -> Double? {
+        let verdicts = snapshot().compactMap { $0.missedDeadline(frameBudgetSeconds: frameBudgetSeconds) }
+        guard !verdicts.isEmpty else { return nil }
+        return Double(verdicts.filter { $0 }.count) / Double(verdicts.count)
+    }
+
+    public func removeAll() {
+        storage.withLock { state in
+            state.frames.removeAll(keepingCapacity: true)
+            state.head = 0
+            state.count = 0
+        }
+    }
+
+    private func statistics(of values: [UInt64]) -> FrameStatistics? {
+        guard !values.isEmpty else { return nil }
+        let sorted = values.sorted()
+        return FrameStatistics(
+            sampleCount: sorted.count,
+            p50Ns: Self.nearestRank(sorted, percentile: 50),
+            p95Ns: Self.nearestRank(sorted, percentile: 95),
+            p99Ns: Self.nearestRank(sorted, percentile: 99),
+            maxNs: sorted[sorted.count - 1]
+        )
+    }
+
+    /// Nearest-rank percentile of an already-sorted vector.
+    ///
+    /// - Precondition: `sorted` is non-empty and ascending.
+    static func nearestRank(_ sorted: [UInt64], percentile: Double) -> UInt64 {
+        let rank = Int((percentile / 100 * Double(sorted.count)).rounded(.up))
+        return sorted[Swift.max(1, Swift.min(rank, sorted.count)) - 1]
+    }
+}
