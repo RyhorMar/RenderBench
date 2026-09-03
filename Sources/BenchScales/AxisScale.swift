@@ -31,13 +31,35 @@ public struct MapResult: Sendable, Equatable {
     }
 }
 
-/// Measures rendered text width so that tick density can be chosen without over-plotting.
+/// Which way an axis runs, and therefore which dimension of a label limits how many fit.
+///
+/// The distinction is not cosmetic: labels on a horizontal axis collide along their width, labels
+/// on a vertical axis collide along their line height. A single measurement cannot answer both.
+public enum AxisOrientation: Sendable {
+    case horizontal
+    case vertical
+}
+
+/// Measures rendered text so that tick density can be chosen without over-plotting.
 ///
 /// Behind a protocol on purpose: the implementation needs CoreText or UIKit, and this module is
-/// not allowed to import either. The drawing layer supplies one; tests supply a fixed-width stub.
+/// not allowed to import either. The drawing layer supplies one; tests supply a fixed-size stub.
 public protocol TextMeasuring: Sendable {
     /// Width of `text` in points, in whatever font the caller has configured.
     func width(of text: String) -> Double
+    /// Height of one line in points, in the same font.
+    var lineHeight: Double { get }
+}
+
+extension TextMeasuring {
+    /// Smallest centre-to-centre spacing at which two labels do not touch, in points.
+    ///
+    /// The 1.5 factor is a gutter, not a measurement: labels that merely abut are unreadable even
+    /// though they do not overlap.
+    public func minimumSpacing(for text: String, along orientation: AxisOrientation) -> Double {
+        let extent = orientation == .horizontal ? width(of: text) : lineHeight
+        return extent * 1.5
+    }
 }
 
 /// Projection between data space and the normalised `[0, 1]` space every backend draws in.
@@ -54,10 +76,18 @@ public protocol AxisScale: Sendable {
     /// Ticks for the current domain, aiming for `target` labels without letting them collide.
     ///
     /// - Parameters:
-    ///   - target: Labels the caller would like. Treated as an upper bound, never a guarantee.
+    ///   - target: Largest number of ticks that may be returned. A hard cap, not a wish: a caller
+    ///     sizing a label pool from it must not be handed more.
     ///   - axisLength: Length of the axis in points. Required: collision avoidance is arithmetic
-    ///     on measured text width against available length, and without the length the measurer
-    ///     is decoration.
-    ///   - measuring: Supplies rendered text width in the caller's font.
-    func ticks(target: Int, axisLength: Double, measuring: some TextMeasuring) -> [Tick]
+    ///     on a measured label against available length, and without the length the measurer is
+    ///     decoration.
+    ///   - orientation: Which dimension of a label limits spacing on this axis.
+    ///   - measuring: Supplies rendered text metrics in the caller's font.
+    /// - Returns: At most `target` ticks, ordered by increasing value.
+    func ticks(
+        target: Int,
+        axisLength: Double,
+        orientation: AxisOrientation,
+        measuring: some TextMeasuring
+    ) -> [Tick]
 }

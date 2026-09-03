@@ -1,33 +1,36 @@
 {
-  "comment": "Which modules each target may import. `system` lists system frameworks; `local` lists other targets in this package. Anything absent from both is a violation. Keep in sync with the target graph in Package.swift: CheckImports fails when a source directory has no entry here.",
+  "comment": "Which modules each target may import, keyed by the target's directory. `system` lists system frameworks; `local` lists other targets in this package. Anything absent from both is a violation. Every directory under the roots below must have an entry: CheckImports fails on one that does not, so adding a target without stating its layer is caught rather than silently exempt.",
+  "roots": ["Sources", "Tests", "Examples"],
   "targets": {
-    "BenchCore": {
-      "system": ["Foundation"],
-      "local": []
-    },
-    "BenchScales": {
-      "system": ["Foundation"],
-      "local": ["BenchCore"]
-    },
-    "BenchDownsampling": {
-      "system": ["Foundation"],
-      "local": ["BenchCore", "BenchScales"]
-    },
-    "BenchGenerators": {
-      "system": ["Foundation"],
-      "local": ["BenchCore"]
-    },
-    "BenchRuntime": {
+    "Sources/BenchCore": { "system": ["Foundation"], "local": [] },
+    "Sources/BenchScales": { "system": ["Foundation"], "local": ["BenchCore"] },
+    "Sources/BenchDownsampling": { "system": ["Foundation"], "local": ["BenchCore", "BenchScales"] },
+    "Sources/BenchGenerators": { "system": ["Foundation"], "local": ["BenchCore"] },
+    "Sources/BenchRuntime": {
       "system": ["Foundation", "Synchronization", "QuartzCore", "Metal", "os"],
       "local": ["BenchCore", "BenchScales", "BenchDownsampling"]
     },
-    "BenchTestSupport": {
-      "system": ["Foundation"],
-      "local": ["BenchCore", "BenchScales"]
-    },
-    "CanvasBackend": {
+    "Sources/BenchTestSupport": { "system": ["Foundation"], "local": ["BenchCore", "BenchScales"] },
+    "Sources/CanvasBackend": {
       "system": ["Foundation", "SwiftUI", "CoreGraphics"],
       "local": ["BenchCore", "BenchScales", "BenchDownsampling", "BenchRuntime"]
+    },
+
+    "Examples": {
+      "comment": "The quickstart exists to prove a consumer needs nothing but the data layer. A UI framework or a runtime type appearing here means that claim has quietly stopped being true.",
+      "system": ["Foundation"],
+      "local": ["BenchCore"]
+    },
+
+    "Tests/BenchCoreTests": { "system": ["Foundation", "Testing"], "local": ["BenchCore"] },
+    "Tests/BenchScalesTests": { "system": ["Foundation", "Testing"], "local": ["BenchCore", "BenchScales", "BenchTestSupport"] },
+    "Tests/BenchDownsamplingTests": { "system": ["Foundation", "Testing"], "local": ["BenchCore", "BenchScales", "BenchDownsampling", "BenchTestSupport"] },
+    "Tests/BenchGeneratorsTests": { "system": ["Foundation", "Testing"], "local": ["BenchCore", "BenchGenerators"] },
+    "Tests/BenchRuntimeTests": { "system": ["Foundation", "Testing"], "local": ["BenchCore", "BenchRuntime", "BenchTestSupport"] },
+    "Tests/BenchTestSupportTests": { "system": ["Foundation", "Testing"], "local": ["BenchTestSupport"] },
+    "Tests/CanvasBackendTests": {
+      "system": ["Foundation", "Testing", "SwiftUI", "CoreGraphics"],
+      "local": ["BenchCore", "BenchScales", "BenchDownsampling", "BenchRuntime", "BenchTestSupport", "CanvasBackend"]
     }
   }
 }

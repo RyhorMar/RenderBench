@@ -7,6 +7,7 @@ struct ContentView: View {
     // Read inside the view that owns the renderer, not at App level: at App level the value is
     // aggregated across scenes and reports active while this one is not.
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         VStack(spacing: 12) {
@@ -20,6 +21,7 @@ struct ContentView: View {
         .onAppear { scene.start() }
         .onDisappear { scene.stop() }
         .onChange(of: scene.scenario) { _, _ in scene.rebuild() }
+        .onChange(of: colorScheme, initial: true) { _, scheme in scene.isDark = scheme == .dark }
         .onChange(of: scenePhase) { _, phase in
             // A render loop left running behind a backgrounded app keeps a CPU busy for pixels
             // nobody can see, and on a real device it shows up as battery rather than as a bug.
@@ -88,8 +90,8 @@ private struct ChartPane: View {
     let scene: ChartScene
 
     var body: some View {
-        CanvasChartView(frame: scene.frame, lineWidth: 1.5)
-            .background(Color(white: 0.99))
+        CanvasChartView(frame: scene.frame)
+            .background(Color(.secondarySystemGroupedBackground))
             .overlay(alignment: .topTrailing) { HUDView(scene: scene).padding(8) }
             .onGeometryChange(for: CGSize.self) { $0.size } action: { scene.chartSize = $0 }
             .frame(maxWidth: .infinity, maxHeight: .infinity)

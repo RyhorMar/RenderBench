@@ -36,27 +36,37 @@ public struct NullMask: Sendable {
     ///
     /// - Complexity: O(*count*).
     public func segments() -> [Range<Int>] {
-        withUnsafeFlags { flags in
-            var result: [Range<Int>] = []
-            var runStart: Int?
-            for index in 0..<flags.count {
-                if flags[index] {
-                    if let begin = runStart {
-                        result.append(begin..<index)
-                        runStart = nil
-                    }
-                } else if runStart == nil {
-                    runStart = index
-                }
-            }
-            if let begin = runStart {
-                result.append(begin..<flags.count)
-            }
-            return result
-        }
+        withUnsafeFlags(runsOfMeasurements(in:))
     }
 
     public mutating func removeAll() {
         flags.removeAll()
     }
+}
+
+/// Ranges of consecutive positions that carry measurements, given a buffer of gap flags.
+///
+/// Free function rather than a method so that the downsampler — which receives flags borrowed from
+/// a provider and never sees a `NullMask` — computes segments with the same code that `NullMask`
+/// does. Two implementations of "where does the line break" is one more than the number of answers
+/// that can be right.
+///
+/// - Complexity: O(*n*).
+public func runsOfMeasurements(in gaps: UnsafeBufferPointer<Bool>) -> [Range<Int>] {
+    var runs: [Range<Int>] = []
+    var start: Int?
+    for index in 0..<gaps.count {
+        if gaps[index] {
+            if let begin = start {
+                runs.append(begin..<index)
+                start = nil
+            }
+        } else if start == nil {
+            start = index
+        }
+    }
+    if let begin = start {
+        runs.append(begin..<gaps.count)
+    }
+    return runs
 }

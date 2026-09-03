@@ -8,48 +8,43 @@ public struct LinearScale: AxisScale {
         self.domain = domain
     }
 
-    private var span: Double { domain.upperBound - domain.lowerBound }
-
     public func map(_ value: Double) -> MapResult {
-        guard span > 0 else {
-            // A degenerate domain has no proportion to report. Everything lands mid-axis and is
-            // flagged, so a caller cannot mistake the collapse for data sitting at the centre.
-            return MapResult(normalised: 0.5, isOutOfDomain: true)
-        }
-        let raw = (value - domain.lowerBound) / span
-        let outside = value < domain.lowerBound || value > domain.upperBound
-        return MapResult(normalised: min(max(raw, 0), 1), isOutOfDomain: outside)
+        proportional(value, in: domain)
     }
 
     public func invert(_ normalised: Double) -> Double {
-        domain.lowerBound + normalised * span
+        proportionalInverse(normalised, in: domain)
     }
 
-    public func ticks(target: Int, axisLength: Double, measuring: some TextMeasuring) -> [Tick] {
+    public func ticks(
+        target: Int,
+        axisLength: Double,
+        orientation: AxisOrientation,
+        measuring: some TextMeasuring
+    ) -> [Tick] {
+        let span = domain.upperBound - domain.lowerBound
         guard span > 0, target > 0 else { return [] }
-        let step = NiceSteps.step(forSpan: span, targetCount: target)
+
+        // Measured with the step the caller's target implies. Both ends are offered, because the
+        // longer label is as often the negative lower bound as the upper one.
+        let probeStep = NiceSteps.step(forSpan: span, targetCount: target)
+        let probeDecimals = NiceSteps.decimals(forStep: probeStep)
+        let affordable = TickLayout.affordableCount(
+            target: target,
+            axisLength: axisLength,
+            candidates: [
+                Self.label(for: domain.lowerBound, decimals: probeDecimals),
+                Self.label(for: domain.upperBound, decimals: probeDecimals),
+            ],
+            orientation: orientation,
+            measuring: measuring
+        )
+
+        let step = NiceSteps.step(forSpan: span, targetCount: affordable)
         let decimals = NiceSteps.decimals(forStep: step)
-
-        // How many labels the axis can physically hold, measured rather than assumed. Without
-        // this the caller's target silently becomes a promise the axis cannot keep and labels
-        // overlap at exactly the zoom levels where the reader is looking hardest.
-        let widest = measuring.width(of: Self.label(for: domain.upperBound, decimals: decimals))
-        let affordable = widest > 0 ? Int(axisLength / (widest * 1.5)) : target
-        let effective = max(2, min(target, max(affordable, 2)))
-        let chosenStep = NiceSteps.step(forSpan: span, targetCount: effective)
-        let chosenDecimals = NiceSteps.decimals(forStep: chosenStep)
-
-        var ticks: [Tick] = []
-        var value = NiceSteps.alignedUp(domain.lowerBound, to: chosenStep)
-        // Bounded so that a pathological domain cannot spin here; the bound is far above any
-        // label count an axis could display.
-        while value <= domain.upperBound + chosenStep * 1e-9, ticks.count < 10_000 {
-            ticks.append(
-                Tick(value: value, label: Self.label(for: value, decimals: chosenDecimals), isMajor: true)
-            )
-            value += chosenStep
+        return TickLayout.walk(domain: domain, step: step, cap: target) {
+            Self.label(for: $0, decimals: decimals)
         }
-        return ticks
     }
 
     private static func label(for value: Double, decimals: Int) -> String {

@@ -11,6 +11,9 @@ struct Rules: Decodable {
         let system: [String]
         let local: [String]
     }
+    /// Directories to walk, relative to the package root.
+    let roots: [String]
+    /// Rules keyed by the target's directory, also relative to the package root.
     let targets: [String: Target]
 }
 
@@ -57,7 +60,6 @@ let root = URL(
     fileURLWithPath: arguments.count > 1 ? arguments[1] : FileManager.default.currentDirectoryPath
 )
 let rulesURL = root.appendingPathComponent("Scripts/import-rules.json")
-let sourcesURL = root.appendingPathComponent("Sources")
 
 let rules: Rules
 do {
@@ -68,18 +70,40 @@ do {
 }
 
 let fileManager = FileManager.default
-let targetDirectories: [String]
-do {
-    targetDirectories = try fileManager.contentsOfDirectory(atPath: sourcesURL.path)
-        .filter { name in
-            var isDirectory: ObjCBool = false
-            let path = sourcesURL.appendingPathComponent(name).path
-            return fileManager.fileExists(atPath: path, isDirectory: &isDirectory)
-                && isDirectory.boolValue
+
+/// Directories holding one target's sources, relative to the package root.
+///
+/// Every root is walked, not just `Sources`. Checking sources alone left the quickstart and every
+/// test target exempt from the layering rule — including the one file whose whole purpose is to
+/// prove a consumer needs no UI framework.
+@MainActor
+func discoverTargetDirectories(under roots: [String]) -> [String] {
+    var found: [String] = []
+    for rootName in roots {
+        let rootURL = root.appendingPathComponent(rootName)
+        var isDirectory: ObjCBool = false
+        guard fileManager.fileExists(atPath: rootURL.path, isDirectory: &isDirectory) else { continue }
+        guard isDirectory.boolValue else { continue }
+
+        // A root may itself be one target — `Examples` holds sources directly — or a folder of
+        // them, as `Sources` and `Tests` do.
+        let entries = (try? fileManager.contentsOfDirectory(atPath: rootURL.path)) ?? []
+        let subdirectories = entries.filter { name in
+            var isSub: ObjCBool = false
+            let path = rootURL.appendingPathComponent(name).path
+            return fileManager.fileExists(atPath: path, isDirectory: &isSub) && isSub.boolValue
         }
-        .sorted()
-} catch {
-    FileHandle.standardError.write(Data("cannot list \(sourcesURL.path): \(error)\n".utf8))
+        let holdsSwiftDirectly = entries.contains { $0.hasSuffix(".swift") }
+
+        if holdsSwiftDirectly { found.append(rootName) }
+        found.append(contentsOf: subdirectories.map { "\(rootName)/\($0)" })
+    }
+    return found.sorted()
+}
+
+let targetDirectories = discoverTargetDirectories(under: rules.roots)
+guard !targetDirectories.isEmpty else {
+    FileHandle.standardError.write(Data("no target directories under \(rules.roots)\n".utf8))
     exit(2)
 }
 
@@ -92,7 +116,7 @@ for target in targetDirectories {
         continue
     }
     let allowed = Set(rule.system).union(rule.local)
-    let directory = sourcesURL.appendingPathComponent(target)
+    let directory = root.appendingPathComponent(target)
     guard let walker = fileManager.enumerator(atPath: directory.path) else { continue }
 
     for case let relativePath as String in walker where relativePath.hasSuffix(".swift") {
@@ -105,7 +129,7 @@ for target in targetDirectories {
             }
             violations.append(
                 Violation(
-                    file: "Sources/\(target)/\(relativePath)",
+                    file: "\(target)/\(relativePath)",
                     line: offset + 1,
                     module: module,
                     target: target
@@ -116,7 +140,7 @@ for target in targetDirectories {
 }
 
 for target in unruled {
-    print("error: Sources/\(target) has no entry in Scripts/import-rules.json")
+    print("error: \(target) has no entry in Scripts/import-rules.json")
 }
 for violation in violations {
     print("\(violation.file):\(violation.line): error: \(violation.target) may not import \(violation.module)")

@@ -118,6 +118,10 @@ let package = Package(
         .testTarget(name: "BenchGeneratorsTests", dependencies: ["BenchGenerators"], swiftSettings: strict),
         .testTarget(name: "BenchRuntimeTests", dependencies: ["BenchRuntime", "BenchTestSupport"], swiftSettings: strict),
         .testTarget(name: "BenchTestSupportTests", dependencies: ["BenchTestSupport"], swiftSettings: strict),
-        .testTarget(name: "CanvasBackendTests", dependencies: ["CanvasBackend"], swiftSettings: strictMainActor),
+        .testTarget(
+            name: "CanvasBackendTests",
+            dependencies: ["CanvasBackend", "BenchTestSupport"],
+            swiftSettings: strictMainActor
+        ),
     ]
 )

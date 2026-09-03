@@ -76,9 +76,51 @@ public final class MetricsSink: Sendable {
         }
     }
 
+    /// Everything the overlay and a results file need, from one pass over one lock acquisition.
+    ///
+    /// Grouped because the alternative was three separate calls, each copying the whole ring under
+    /// the lock — three times the allocation, three times the time spent blocking `record` from
+    /// the frame path, and three chances for the figures to describe different windows.
+    public struct Summary: Sendable, Equatable {
+        public let cpu: FrameStatistics?
+        public let gpu: FrameStatistics?
+        /// `nil` when no retained frame reported a presentation time — unknowable, not zero.
+        public let missedDeadlineRatio: Double?
+    }
+
+    /// Percentiles of CPU and GPU frame time and the missed-deadline share, over one window.
+    ///
+    /// - Complexity: O(*n* log *n*) in the retained frames, one lock acquisition, two `UInt64`
+    ///   vectors rather than a copy of the records themselves.
+    public func summary(frameBudgetSeconds: Double) -> Summary {
+        var cpuValues: [UInt64] = []
+        var gpuValues: [UInt64] = []
+        var missed = 0
+        var judged = 0
+
+        storage.withLock { state in
+            cpuValues.reserveCapacity(state.count)
+            for offset in 0..<state.count {
+                let metrics = state.frames[self.index(of: offset, in: state)]
+                cpuValues.append(metrics.cpuTotalNs)
+                if let gpu = metrics.gpuNs { gpuValues.append(gpu) }
+                if let late = metrics.missedDeadline(frameBudgetSeconds: frameBudgetSeconds) {
+                    judged += 1
+                    if late { missed += 1 }
+                }
+            }
+        }
+
+        return Summary(
+            cpu: statistics(of: cpuValues),
+            gpu: statistics(of: gpuValues),
+            missedDeadlineRatio: judged > 0 ? Double(missed) / Double(judged) : nil
+        )
+    }
+
     /// Percentiles of total CPU frame time.
     public func cpuStatistics() -> FrameStatistics? {
-        statistics(of: snapshot().map(\.cpuTotalNs))
+        summary(frameBudgetSeconds: .infinity).cpu
     }
 
     /// Percentiles of GPU frame time, over the frames that reported one.
@@ -86,16 +128,19 @@ public final class MetricsSink: Sendable {
     /// Returns `nil` when no frame reported GPU time rather than zero: a CPU backend has no GPU
     /// interval, and a zero here would win every comparison it appears in.
     public func gpuStatistics() -> FrameStatistics? {
-        statistics(of: snapshot().compactMap(\.gpuNs))
+        summary(frameBudgetSeconds: .infinity).gpu
     }
 
     /// Share of retained frames that missed their deadline, over the frames that could tell.
     ///
     /// `nil` when no frame reported a presentation time.
     public func missedDeadlineRatio(frameBudgetSeconds: Double) -> Double? {
-        let verdicts = snapshot().compactMap { $0.missedDeadline(frameBudgetSeconds: frameBudgetSeconds) }
-        guard !verdicts.isEmpty else { return nil }
-        return Double(verdicts.filter { $0 }.count) / Double(verdicts.count)
+        summary(frameBudgetSeconds: frameBudgetSeconds).missedDeadlineRatio
+    }
+
+    /// Position in the backing array of the record `offset` places after the oldest.
+    private func index(of offset: Int, in state: Storage) -> Int {
+        state.count == capacity ? (state.head + offset) % capacity : offset
     }
 
     public func removeAll() {

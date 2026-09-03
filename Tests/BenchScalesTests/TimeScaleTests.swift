@@ -1,28 +1,61 @@
+import BenchTestSupport
 import Testing
 @testable import BenchScales
 
-private struct FixedWidth: TextMeasuring {
-    func width(of text: String) -> Double { Double(text.count) * 7.0 }
-}
+private let measurer = FixedMetrics(pointsPerCharacter: 7.0)
 
 @Test
 func ticksFallOnClockDivisions() {
     let scale = TimeScale(domain: 0...60)
     let step = TimeScale.ladderStep(forSpan: 60, targetCount: 6)
-    let values = scale.ticks(target: 6, axisLength: 600, measuring: FixedWidth()).map(\.value)
+    let values = scale.ticks(target: 6, axisLength: 600, orientation: .horizontal, measuring: measurer).map(\.value)
 
     #expect(TimeScale.ladder.contains(step))
     #expect(values.first == 0)
     #expect(values.allSatisfy { $0.truncatingRemainder(dividingBy: step) == 0 })
 }
 
-/// 2.5 is a fine decimal step and a nonsense clock division. The ladder exists to keep it out.
+/// 2.5 seconds is a fine decimal step and a nonsense clock division. Every step must come from
+/// the ladder — including the sub-second rungs, which the previous version of this test declared
+/// impossible and then avoided by starting its window list at ten seconds.
 @Test
-func decimalStepsNeverReachATimeAxis() {
-    for span in [10.0, 45.0, 200.0, 5_000.0, 90_000.0] {
+func everyStepComesFromTheLadder() {
+    for span in [0.5, 1.0, 3.0, 10.0, 45.0, 200.0, 5_000.0, 90_000.0] {
         let step = TimeScale.ladderStep(forSpan: span, targetCount: 6)
         #expect(step > 0)
-        #expect(step.truncatingRemainder(dividingBy: 1) == 0)
+        let onLadder = TimeScale.ladder.contains(step)
+        let wholeDays = step.truncatingRemainder(dividingBy: 86_400) == 0
+        #expect(onLadder || wholeDays, "span \(span) produced step \(step)")
+    }
+}
+
+/// A one-second window is the reference chart's shortest. With a one-second floor on the ladder
+/// it got two labels, which is an axis with endpoints rather than an axis.
+@Test
+func aOneSecondWindowIsLabelledInTenths() {
+    let ticks = TimeScale(domain: 0...1).ticks(
+        target: 6,
+        axisLength: 600,
+        orientation: .horizontal,
+        measuring: measurer
+    )
+    #expect(ticks.count >= 5)
+    #expect(ticks.contains { $0.label.contains(".") })
+}
+
+/// Formatting converts seconds to an integer. A domain past that range is an empty axis, not a
+/// trap: a caller charting nanosecond-epoch values has made a unit mistake, and a crash is not
+/// how they should find out.
+@Test
+func aDomainTooLargeToLabelYieldsNoTicksInsteadOfTrapping() {
+    for upper in [1e19, 4e18, Double.greatestFiniteMagnitude] {
+        let ticks = TimeScale(domain: 0...upper).ticks(
+            target: 6,
+            axisLength: 400,
+            orientation: .horizontal,
+            measuring: measurer
+        )
+        #expect(ticks.isEmpty, "domain 0...\(upper) should not be labelled")
     }
 }
 
@@ -48,7 +81,7 @@ func zoneOffsetIsCarriedNotInherited() {
 func labelCountStaysInABandAcrossThreeOrdersOfMagnitude() {
     for span in [1.0, 60.0, 3_600.0] {
         let scale = TimeScale(domain: 0...span)
-        let count = scale.ticks(target: 6, axisLength: 600, measuring: FixedWidth()).count
+        let count = scale.ticks(target: 6, axisLength: 600, orientation: .horizontal, measuring: measurer).count
         #expect(count >= 3)
         #expect(count <= 14)
     }
@@ -57,7 +90,7 @@ func labelCountStaysInABandAcrossThreeOrdersOfMagnitude() {
 @Test
 func windowLongerThanADayStillTerminates() {
     let scale = TimeScale(domain: 0...(86_400 * 30))
-    let ticks = scale.ticks(target: 6, axisLength: 600, measuring: FixedWidth())
+    let ticks = scale.ticks(target: 6, axisLength: 600, orientation: .horizontal, measuring: measurer)
     #expect(ticks.isEmpty == false)
     #expect(ticks.count < 100)
 }

@@ -49,6 +49,13 @@ public struct ArrayProvider: ChartDataProvider {
             gaps.reserveCapacity(sampleList.count)
 
             for sample in sampleList {
+                // The doc comment promised this check and did not make it. An unsorted series is
+                // not a crash — the binary search simply returns an empty window — so the mistake
+                // reaches the screen as a blank chart with no explanation.
+                assert(
+                    carriers.last.map { sample.carrier > $0 } ?? true,
+                    "ArrayProvider expects each series sorted by strictly increasing carrier"
+                )
                 carriers.append(sample.carrier)
                 values.append(sample.value)
                 gaps.append(sample.value.isNaN)
@@ -76,7 +83,7 @@ public struct ArrayProvider: ChartDataProvider {
         _ body: (SeriesSlice) -> R
     ) -> R {
         let target = series[index]
-        let range = Self.indices(of: target.carriers, within: window)
+        let range = CarrierSearch.indices(of: target.carriers, within: window)
 
         return target.carriers.withUnsafeBufferPointer { carriers in
             target.values.withUnsafeBufferPointer { values in
@@ -94,31 +101,4 @@ public struct ArrayProvider: ChartDataProvider {
         }
     }
 
-    /// Half-open index range of the carriers falling inside `window`.
-    ///
-    /// Binary search on both ends rather than a filter: the window moves every frame and the
-    /// series does not, so the cost of locating it must not scale with the series length.
-    static func indices(
-        of carriers: [Carrier],
-        within window: ClosedRange<Carrier>
-    ) -> Range<Int> {
-        let start = lowerBound(carriers, notLessThan: window.lowerBound)
-        let end = lowerBound(carriers, notLessThan: window.upperBound.nextUp)
-        return start..<Swift.max(start, end)
-    }
-
-    /// Index of the first element not less than `value`, or `count` when there is none.
-    private static func lowerBound(_ carriers: [Carrier], notLessThan value: Carrier) -> Int {
-        var low = 0
-        var high = carriers.count
-        while low < high {
-            let middle = low + (high - low) / 2
-            if carriers[middle] < value {
-                low = middle + 1
-            } else {
-                high = middle
-            }
-        }
-        return low
-    }
 }

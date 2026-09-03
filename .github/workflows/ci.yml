@@ -18,6 +18,18 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: false
+
+      # Before anything reports a version. XcodeGen is not on the runner image, so asking for its
+      # version first turned every push red at step three, before a line of Swift was compiled.
+      - name: Install tools
+        run: |
+          brew install xcodegen
+          gem install fastlane --no-document
+
       # Not pinned yet on purpose: the first run records what the image actually provides, and the
       # version is pinned in a follow-up commit against those facts rather than against a guess.
       - name: Toolchain versions
@@ -25,16 +37,6 @@ jobs:
           xcodebuild -version
           swift --version
           xcodegen --version
-
-      - uses: ruby/setup-ruby@v1
-        with:
-          ruby-version: "3.3"
-          bundler-cache: false
-
-      - name: Install tools
-        run: |
-          brew install xcodegen
-          gem install fastlane --no-document
 
       # Builds the package, runs the tests, checks the layering rule, generates the demo project
       # and builds it for a simulator.

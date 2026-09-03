@@ -47,21 +47,27 @@ public struct SlotCounters: Sendable, Equatable {
 ///
 /// A lossless record, when one is needed, is a second channel, not a deeper queue here.
 public final class FrameSlot: Sendable {
-    private let storage = Mutex<FrameSnapshot?>(nil)
-    private let tally = Mutex<SlotCounters>(SlotCounters())
+    /// The snapshot and the counters describing it, under one lock.
+    ///
+    /// One `Mutex`, not two. With the slot and the tally locked separately a reader could observe
+    /// a delivery that had not been produced yet — the producer having released the slot lock
+    /// before incrementing its counter — and a results file computed from that pair reports a
+    /// drop ratio built from two different instants.
+    private struct State {
+        var pending: FrameSnapshot?
+        var counters = SlotCounters()
+    }
+
+    private let state = Mutex<State>(State())
 
     public init() {}
 
     /// Publishes a snapshot, replacing any the renderer has not taken.
     public func publish(_ snapshot: FrameSnapshot) {
-        let replaced = storage.withLock { slot -> Bool in
-            let hadUntaken = slot != nil
-            slot = snapshot
-            return hadUntaken
-        }
-        tally.withLock { counters in
-            counters.produced &+= 1
-            if replaced { counters.dropped &+= 1 }
+        state.withLock { state in
+            if state.pending != nil { state.counters.dropped &+= 1 }
+            state.pending = snapshot
+            state.counters.produced &+= 1
         }
     }
 
@@ -70,21 +76,20 @@ public final class FrameSlot: Sendable {
     /// - Parameter epoch: Generation the caller is prepared to draw. Snapshots from an older one
     ///   are discarded and counted, never returned.
     public func take(epoch: UInt64) -> FrameSnapshot? {
-        let taken = storage.withLock { slot -> FrameSnapshot? in
-            defer { slot = nil }
-            return slot
+        state.withLock { state in
+            guard let taken = state.pending else { return nil }
+            state.pending = nil
+            guard taken.epoch == epoch else {
+                state.counters.staleEpoch &+= 1
+                return nil
+            }
+            state.counters.delivered &+= 1
+            return taken
         }
-        guard let taken else { return nil }
-        guard taken.epoch == epoch else {
-            tally.withLock { $0.staleEpoch &+= 1 }
-            return nil
-        }
-        tally.withLock { $0.delivered &+= 1 }
-        return taken
     }
 
-    /// Current counts.
+    /// Current counts, consistent with each other and with the slot they describe.
     public var counters: SlotCounters {
-        tally.withLock { $0 }
+        state.withLock { $0.counters }
     }
 }

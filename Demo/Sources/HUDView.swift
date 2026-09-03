@@ -18,6 +18,12 @@ struct HUDView: View {
             }
             row("points", "\(scene.frame.pointsDrawn)")
             row("dropped", "\(scene.droppedFrames)")
+            // A refused series is shown, not absorbed. A chart quietly missing a curve is the one
+            // failure mode a reader cannot detect from the picture.
+            if scene.frame.failures.isEmpty == false {
+                row("refused", "\(scene.frame.failures.count)")
+                    .foregroundStyle(.red)
+            }
         }
         .font(.system(size: 10, weight: .medium, design: .monospaced))
         .padding(6)

@@ -1,27 +1,24 @@
 import BenchCore
-import BenchScales
 import SwiftUI
 
 /// Strokes a prepared frame. Holds no state and computes nothing.
 ///
-/// Everything it draws was decided before the frame started, which is what makes the CPU cost of a
-/// Canvas backend measurable as two separate numbers instead of one lump.
+/// Everything it draws was decided before the frame started — including where each tick sits, so
+/// the view has no projection of its own to get wrong. That is what makes the CPU cost of a Canvas
+/// backend measurable as two separate numbers instead of one lump.
 public struct CanvasChartView: View {
     private let frame: CanvasFrame
-    private let lineWidth: Double
     private let axisColour: Color
     private let gridColour: Color
     private let labelColour: Color
 
     public init(
         frame: CanvasFrame,
-        lineWidth: Double,
         axisColour: Color = .secondary,
         gridColour: Color = Color.secondary.opacity(0.18),
         labelColour: Color = .secondary
     ) {
         self.frame = frame
-        self.lineWidth = lineWidth
         self.axisColour = axisColour
         self.gridColour = gridColour
         self.labelColour = labelColour
@@ -34,7 +31,7 @@ public struct CanvasChartView: View {
 
             var grid = Path()
             for tick in frame.yTicks {
-                let y = plot.maxY - CGFloat(normalised(tick.value, in: frame.yTicks)) * plot.height
+                let y = plot.maxY - CGFloat(tick.position) * plot.height
                 grid.move(to: CGPoint(x: plot.minX, y: y))
                 grid.addLine(to: CGPoint(x: plot.maxX, y: y))
             }
@@ -50,22 +47,26 @@ public struct CanvasChartView: View {
                 context.stroke(
                     stroke.path,
                     with: .color(colour(stroke.colour)),
-                    style: StrokeStyle(lineWidth: lineWidth, lineCap: .round, lineJoin: .round)
+                    style: StrokeStyle(
+                        lineWidth: frame.lineWidth,
+                        lineCap: .round,
+                        lineJoin: .round
+                    )
                 )
             }
 
             for tick in frame.yTicks {
-                let y = plot.maxY - CGFloat(normalised(tick.value, in: frame.yTicks)) * plot.height
+                let y = plot.maxY - CGFloat(tick.position) * plot.height
                 context.draw(
-                    Text(tick.label).font(.system(size: 9, design: .monospaced)).foregroundStyle(labelColour),
+                    label(tick.label),
                     at: CGPoint(x: plot.minX - 6, y: y),
                     anchor: .trailing
                 )
             }
             for tick in frame.xTicks {
-                let x = plot.minX + CGFloat(normalisedX(tick.value)) * plot.width
+                let x = plot.minX + CGFloat(tick.position) * plot.width
                 context.draw(
-                    Text(tick.label).font(.system(size: 9, design: .monospaced)).foregroundStyle(labelColour),
+                    label(tick.label),
                     at: CGPoint(x: x, y: plot.maxY + 10),
                     anchor: .center
                 )
@@ -73,20 +74,13 @@ public struct CanvasChartView: View {
         }
     }
 
+    private func label(_ text: String) -> Text {
+        Text(text)
+            .font(.system(size: 9, design: .monospaced))
+            .foregroundStyle(labelColour)
+    }
+
     private func colour(_ palette: PaletteColor) -> Color {
         Color(.sRGBLinear, red: palette.red, green: palette.green, blue: palette.blue)
-    }
-
-    private func normalised(_ value: Double, in ticks: [Tick]) -> Double {
-        guard let low = ticks.first?.value, let high = ticks.last?.value, high > low else { return 0.5 }
-        return (value - low) / (high - low)
-    }
-
-    private func normalisedX(_ value: Double) -> Double {
-        guard let low = frame.xTicks.first?.value,
-              let high = frame.xTicks.last?.value,
-              high > low
-        else { return 0.5 }
-        return (value - low) / (high - low)
     }
 }

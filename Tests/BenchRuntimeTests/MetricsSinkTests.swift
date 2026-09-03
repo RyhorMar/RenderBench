@@ -100,3 +100,45 @@ func cpuTotalIsTheSumOfItsParts() {
     let metrics = frame(1, cpuNs: 9_000_001)
     #expect(metrics.cpuTotalNs == 9_000_001)
 }
+
+/// The three figures now come from one pass over one lock acquisition, so they cannot describe
+/// different windows — and the ring is no longer copied three times per report.
+@Test
+func summaryAgreesWithTheIndividualAccessors() {
+    let sink = MetricsSink(capacity: 64)
+    for id in 1...40 {
+        sink.record(
+            frame(
+                UInt64(id),
+                cpuNs: UInt64(id) * 100_000,
+                gpuNs: id % 2 == 0 ? UInt64(id) * 50_000 : nil,
+                presented: id % 3 == 0 ? 1.05 : 1.0,
+                target: 1.0
+            )
+        )
+    }
+    let budget = 1.0 / 120.0
+    let summary = sink.summary(frameBudgetSeconds: budget)
+
+    #expect(summary.cpu == sink.cpuStatistics())
+    #expect(summary.gpu == sink.gpuStatistics())
+    #expect(summary.missedDeadlineRatio == sink.missedDeadlineRatio(frameBudgetSeconds: budget))
+    #expect(summary.gpu?.sampleCount == 20)
+}
+
+/// Nearest-rank on a vector with ties and duplicates, which the shared fixture does not contain.
+@Test
+func nearestRankHandlesTiesAndDuplicates() {
+    let sorted: [UInt64] = [5, 5, 5, 5, 5, 9, 9, 9, 9, 100]
+    #expect(MetricsSink.nearestRank(sorted, percentile: 50) == 5)
+    #expect(MetricsSink.nearestRank(sorted, percentile: 60) == 9)
+    #expect(MetricsSink.nearestRank(sorted, percentile: 100) == 100)
+}
+
+@Test
+func summaryOverAnEmptySinkReportsNothingRatherThanZero() {
+    let summary = MetricsSink(capacity: 8).summary(frameBudgetSeconds: 1.0 / 60.0)
+    #expect(summary.cpu == nil)
+    #expect(summary.gpu == nil)
+    #expect(summary.missedDeadlineRatio == nil)
+}

@@ -34,7 +34,7 @@ public struct SeriesCollectionProvider: ChartDataProvider {
         _ body: (SeriesSlice) -> R
     ) -> R {
         series[index].withSlice { slice in
-            let range = Self.indices(of: slice.carriers, within: window)
+            let range = CarrierSearch.indices(of: slice.carriers, within: window)
             return body(
                 SeriesSlice(
                     carriers: UnsafeBufferPointer(rebasing: slice.carriers[range]),
@@ -46,28 +46,4 @@ public struct SeriesCollectionProvider: ChartDataProvider {
         }
     }
 
-    /// Half-open index range of the carriers falling inside `window`, by binary search on both
-    /// ends. The window moves every frame and the buffer does not, so locating it must not cost
-    /// anything proportional to the buffer.
-    static func indices(
-        of carriers: UnsafeBufferPointer<Carrier>,
-        within window: ClosedRange<Carrier>
-    ) -> Range<Int> {
-        let start = lowerBound(carriers, notLessThan: window.lowerBound)
-        let end = lowerBound(carriers, notLessThan: window.upperBound.nextUp)
-        return start..<Swift.max(start, end)
-    }
-
-    private static func lowerBound(
-        _ carriers: UnsafeBufferPointer<Carrier>,
-        notLessThan value: Carrier
-    ) -> Int {
-        var low = 0
-        var high = carriers.count
-        while low < high {
-            let middle = low + (high - low) / 2
-            if carriers[middle] < value { low = middle + 1 } else { high = middle }
-        }
-        return low
-    }
 }

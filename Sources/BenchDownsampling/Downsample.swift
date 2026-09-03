@@ -13,7 +13,10 @@ import BenchScales
 ///
 /// - Parameters:
 ///   - slice: Samples to reduce, ordered by increasing carrier.
-///   - targetPoints: Upper bound on emitted points, gap markers excluded.
+///   - targetPoints: Upper bound on emitted points, gap markers excluded. Honoured exactly, with
+///     one stated exception: every uninterrupted stretch contributes at least one point, so a
+///     slice broken into more stretches than `targetPoints` emits one point per stretch instead.
+///     Dropping stretches outright would erase intervals the reader has no way to know existed.
 ///   - policy: How to choose which points survive. See ``DownsamplePolicy``.
 ///   - xScale: Projection of the carrier. Used by `lttb` so its metric is unit-free.
 ///   - yScale: Projection of the value. Used by `lttb` for the same reason.
@@ -42,7 +45,7 @@ public func downsample(
         throw ChartError.nonAveragable(unit: slice.metadata.unit)
     }
 
-    let segments = contiguousRuns(in: slice.gaps)
+    let segments = runsOfMeasurements(in: slice.gaps)
     guard !segments.isEmpty else { return }
 
     if policy == .none || slice.count <= targetPoints {
@@ -50,38 +53,37 @@ public func downsample(
         return
     }
 
-    let total = segments.reduce(0) { $0 + $1.count }
+    // The budget is spent, not merely divided. Allocating each stretch its proportional share
+    // independently is what let a gappy slice emit several times the cap: a floor of two points
+    // per stretch multiplied by the stretch count with nothing tracking the total.
+    var remainingBudget = targetPoints
+    var remainingSamples = segments.reduce(0) { $0 + $1.count }
+
     for (index, segment) in segments.enumerated() {
-        // Budget split by share of the samples, so a long stretch is not reduced as hard as a
-        // short one just because they are both stretches.
-        let share = max(2, targetPoints * segment.count / max(total, 1))
+        let stretchesLeft = segments.count - index
+        let proportional = remainingSamples > 0
+            ? remainingBudget * segment.count / remainingSamples
+            : 0
+        // Every stretch keeps at least one point, and never takes so much that a later stretch
+        // cannot have its one.
+        let share = max(1, min(proportional, remainingBudget - (stretchesLeft - 1)))
+        let before = output.count
+
         switch policy {
         case .minMax:
             appendMinMax(slice, segment: segment, budget: share, into: &output)
         case .lttb:
             appendLTTB(slice, segment: segment, budget: share, xScale: xScale, yScale: yScale, into: &output)
         case .none:
-            break
+            preconditionFailure("policy .none returns above; reaching here would emit only gap markers")
         }
+
+        remainingBudget -= output.count - before
+        remainingSamples -= segment.count
         if index < segments.count - 1 {
             output.append(Sample(carrier: slice.carriers[segment.upperBound - 1], value: .nan))
         }
     }
-}
-
-/// Index ranges of consecutive positions that carry measurements.
-func contiguousRuns(in gaps: UnsafeBufferPointer<Bool>) -> [Range<Int>] {
-    var runs: [Range<Int>] = []
-    var start: Int?
-    for index in 0..<gaps.count {
-        if gaps[index] {
-            if let begin = start { runs.append(begin..<index); start = nil }
-        } else if start == nil {
-            start = index
-        }
-    }
-    if let begin = start { runs.append(begin..<gaps.count) }
-    return runs
 }
 
 private func emitEverything(
@@ -114,6 +116,20 @@ private func appendMinMax(
     let last = slice.carriers[segment.upperBound - 1]
     let span = last - first
     let bucketCount = max(1, budget / 2)
+    // A budget of one cannot afford a pair, so the stretch is represented by whichever end of its
+    // range is further from the other — the point whose loss would change the picture most.
+    if budget == 1 {
+        var extreme = segment.lowerBound
+        var middle = 0.0
+        for position in segment { middle += slice.values[position] }
+        middle /= Double(segment.count)
+        for position in segment
+        where abs(slice.values[position] - middle) > abs(slice.values[extreme] - middle) {
+            extreme = position
+        }
+        output.append(Sample(carrier: slice.carriers[extreme], value: slice.values[extreme]))
+        return
+    }
     guard span > 0, segment.count > 2 else {
         for position in segment {
             output.append(Sample(carrier: slice.carriers[position], value: slice.values[position]))
@@ -124,6 +140,7 @@ private func appendMinMax(
 
     var position = segment.lowerBound
     var bucket = 0
+    var emitted = 0
     while position < segment.upperBound, bucket < bucketCount {
         let edge = bucket == bucketCount - 1 ? last.nextUp : first + Double(bucket + 1) * width
         var minimum = position
@@ -136,14 +153,16 @@ private func appendMinMax(
             if slice.values[position] > slice.values[maximum] { maximum = position }
             position += 1
         }
-        if scanned {
+        if scanned, emitted < budget {
             // Ordered by carrier, not by magnitude: emitting the maximum first would draw the
             // line back on itself inside every bucket.
             let earlier = min(minimum, maximum)
             let later = max(minimum, maximum)
             output.append(Sample(carrier: slice.carriers[earlier], value: slice.values[earlier]))
-            if later != earlier {
+            emitted += 1
+            if later != earlier, emitted < budget {
                 output.append(Sample(carrier: slice.carriers[later], value: slice.values[later]))
+                emitted += 1
             }
         }
         bucket += 1
@@ -167,7 +186,20 @@ private func appendLTTB(
     yScale: some AxisScale,
     into output: inout [Sample]
 ) {
-    guard segment.count > budget, budget >= 3 else {
+    guard budget >= 3 else {
+        // Not enough room for an interior point. Emitting the whole stretch instead — which is
+        // what this guard used to do — turned the budget into a suggestion and let a gappy slice
+        // submit several times the requested point count.
+        output.append(
+            Sample(carrier: slice.carriers[segment.lowerBound], value: slice.values[segment.lowerBound])
+        )
+        if budget >= 2, segment.count > 1 {
+            let last = segment.upperBound - 1
+            output.append(Sample(carrier: slice.carriers[last], value: slice.values[last]))
+        }
+        return
+    }
+    guard segment.count > budget else {
         for position in segment {
             output.append(Sample(carrier: slice.carriers[position], value: slice.values[position]))
         }

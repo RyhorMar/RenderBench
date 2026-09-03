@@ -29,71 +29,91 @@ public struct TimeScale: AxisScale {
         86_400,
     ]
 
+    /// Largest instant this scale can label.
+    ///
+    /// Formatting converts seconds to an integer, so a domain beyond this cannot be rendered. It
+    /// is reported as an empty axis rather than a trap: a caller charting nanosecond-epoch values
+    /// has made a unit mistake, and crashing their process is not how they should find out.
+    static let labelableLimit: Double = 4e18
+
     public init(domain: ClosedRange<Double>, secondsFromGMT: Int = 0) {
         self.domain = domain
         self.secondsFromGMT = secondsFromGMT
     }
 
-    private var span: Double { domain.upperBound - domain.lowerBound }
-
     public func map(_ value: Double) -> MapResult {
-        guard span > 0 else { return MapResult(normalised: 0.5, isOutOfDomain: true) }
-        let raw = (value - domain.lowerBound) / span
-        let outside = value < domain.lowerBound || value > domain.upperBound
-        return MapResult(normalised: min(max(raw, 0), 1), isOutOfDomain: outside)
+        proportional(value, in: domain)
     }
 
     public func invert(_ normalised: Double) -> Double {
-        domain.lowerBound + normalised * span
+        proportionalInverse(normalised, in: domain)
     }
 
-    public func ticks(target: Int, axisLength: Double, measuring: some TextMeasuring) -> [Tick] {
-        guard span > 0, target > 0 else { return [] }
+    public func ticks(
+        target: Int,
+        axisLength: Double,
+        orientation: AxisOrientation,
+        measuring: some TextMeasuring
+    ) -> [Tick] {
+        let span = domain.upperBound - domain.lowerBound
+        guard span > 0, target > 0, isLabelable else { return [] }
 
-        let sample = Self.label(forSecond: domain.upperBound, offset: secondsFromGMT, step: 1)
-        let widest = measuring.width(of: sample)
-        let affordable = widest > 0 ? Int(axisLength / (widest * 1.5)) : target
-        let effective = max(2, min(target, max(affordable, 2)))
+        let probeStep = Self.ladderStep(forSpan: span, targetCount: target)
+        let affordable = TickLayout.affordableCount(
+            target: target,
+            axisLength: axisLength,
+            candidates: [
+                Self.label(forSecond: domain.lowerBound, offset: secondsFromGMT, step: probeStep),
+                Self.label(forSecond: domain.upperBound, offset: secondsFromGMT, step: probeStep),
+            ],
+            orientation: orientation,
+            measuring: measuring
+        )
 
-        let step = Self.ladderStep(forSpan: span, targetCount: effective)
-        var ticks: [Tick] = []
-        var value = NiceSteps.alignedUp(domain.lowerBound, to: step)
-        while value <= domain.upperBound + step * 1e-9, ticks.count < 10_000 {
-            ticks.append(
-                Tick(
-                    value: value,
-                    label: Self.label(forSecond: value, offset: secondsFromGMT, step: step),
-                    isMajor: true
-                )
-            )
-            value += step
+        let step = Self.ladderStep(forSpan: span, targetCount: affordable)
+        return TickLayout.walk(domain: domain, step: step, cap: target) {
+            Self.label(forSecond: $0, offset: secondsFromGMT, step: step)
         }
-        return ticks
     }
 
-    /// Coarsest ladder entry that still yields at least `targetCount` intervals, or the coarsest
-    /// entry there is when the window spans more than a day.
+    /// Whether both ends of the domain can be converted to an integer number of seconds.
+    var isLabelable: Bool {
+        domain.lowerBound.isFinite
+            && domain.upperBound.isFinite
+            && abs(domain.lowerBound) < Self.labelableLimit
+            && abs(domain.upperBound) < Self.labelableLimit
+    }
+
+    /// Coarsest ladder entry that still yields at least `targetCount` intervals, or whole days
+    /// when the window spans more than one.
     static func ladderStep(forSpan span: Double, targetCount: Int) -> Double {
+        guard span > 0, targetCount > 0 else { return 1 }
         let ideal = span / Double(targetCount)
         for candidate in ladder where candidate >= ideal { return candidate }
-        // Beyond a day, fall back to whole days so that labels stay on midnight boundaries.
-        return ladder[ladder.count - 1] * (ideal / ladder[ladder.count - 1]).rounded(.up)
+        let day = ladder[ladder.count - 1]
+        return day * max(1, (ideal / day).rounded(.up))
     }
 
     /// Formats one instant at a resolution matched to the step.
     ///
-    /// Seconds appear only when the step is finer than a minute, and the day appears only when the
-    /// step reaches a day; showing more precision than the spacing supports is how an axis ends up
-    /// with six labels that differ in their last digit alone.
+    /// Seconds appear only when the step is finer than a minute, tenths only when it is finer than
+    /// a second, and the day only when the step reaches a day. Showing more precision than the
+    /// spacing supports is how an axis ends up with six labels differing in their last digit alone.
+    ///
+    /// - Precondition: `abs(value + offset) < labelableLimit`. Callers reach this through
+    ///   ``ticks(target:axisLength:orientation:measuring:)``, which refuses such a domain.
     static func label(forSecond value: Double, offset: Int, step: Double) -> String {
-        let total = Int((value + Double(offset)).rounded(.down))
+        let shifted = value + Double(offset)
+        guard shifted.isFinite, abs(shifted) < labelableLimit else { return "" }
+
+        let total = Int(shifted.rounded(.down))
         let secondOfDay = ((total % 86_400) + 86_400) % 86_400
         let hours = secondOfDay / 3_600
         let minutes = (secondOfDay % 3_600) / 60
         let seconds = secondOfDay % 60
 
         if step < 1 {
-            let fraction = value + Double(offset) - Double(total)
+            let fraction = shifted - Double(total)
             return String(format: "%02d:%02d.%01d", minutes, seconds, Int(fraction * 10))
         }
         if step < 60 {

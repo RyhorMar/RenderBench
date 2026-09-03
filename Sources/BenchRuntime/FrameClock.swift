@@ -42,7 +42,9 @@ public protocol DisplayTicking: AnyObject {
 /// it, and drawing code has no way to reach it.
 @MainActor
 public final class FrameClock {
-    /// A registration. Dropping it removes the observer.
+    /// A registration. Hold it for as long as the observer should receive ticks, and pass it to
+    /// ``unsubscribe(_:)`` to stop. Dropping it does **not** unsubscribe — the clock holds the
+    /// closure, not the token.
     public struct Token: Hashable, Sendable {
         fileprivate let id: UInt64
     }
@@ -61,7 +63,10 @@ public final class FrameClock {
     }
 
     /// Registers an observer, starting the source on the first registration.
-    @discardableResult
+    ///
+    /// The returned token is the only handle to the registration, so it is not discardable: a
+    /// caller who drops it can never unsubscribe, the source runs for the life of the clock, and
+    /// the teardown this type documents becomes unreachable.
     public func subscribe(_ body: @escaping (FrameTick) -> Void) -> Token {
         nextToken += 1
         let token = Token(id: nextToken)
@@ -98,7 +103,14 @@ public final class FrameClock {
             timestamp: raw.timestamp
         )
         latest = tick
-        for observer in observers.values {
+
+        // Registration order, taken as a snapshot before the fan-out. Iterating `observers.values`
+        // directly did neither: dictionary order varies with hash seeding, so two charts on one
+        // clock touched a shared provider in a different order between launches — under a claim of
+        // identical work — and an observer that unsubscribed from inside its own callback was
+        // still called for that tick, because the iteration held the pre-removal storage.
+        let ordered = observers.sorted { $0.key < $1.key }.map(\.value)
+        for observer in ordered {
             observer(tick)
         }
     }

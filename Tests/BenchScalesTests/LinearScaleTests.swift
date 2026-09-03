@@ -1,10 +1,8 @@
+import BenchTestSupport
 import Testing
 @testable import BenchScales
 
-private struct FixedWidth: TextMeasuring {
-    var perCharacter: Double = 7.0
-    func width(of text: String) -> Double { Double(text.count) * perCharacter }
-}
+private let measurer = FixedMetrics(pointsPerCharacter: 7.0)
 
 @Test
 func roundTripIsExactToWithinOneMicro() {
@@ -37,20 +35,27 @@ func collapsedDomainIsReportedRatherThanDrawn() {
     let scale = LinearScale(domain: 5...5)
     let result = scale.map(5)
     #expect(result.isOutOfDomain)
-    #expect(scale.ticks(target: 5, axisLength: 400, measuring: FixedWidth()).isEmpty)
+    #expect(scale.ticks(target: 5, axisLength: 400, orientation: .horizontal, measuring: measurer).isEmpty)
 }
 
 @Test
 func ticksLandOnRoundNumbers() {
     let scale = LinearScale(domain: 0...100)
-    let values = scale.ticks(target: 5, axisLength: 400, measuring: FixedWidth()).map(\.value)
-    #expect(values == [0, 20, 40, 60, 80, 100])
+    // Six, not five: both ends of this domain land on a multiple of the step, so covering it
+    // needs one more tick than there are intervals. Asking for five gets five — the target is a
+    // cap, and a caller sizing a label pool from it must not be handed a sixth.
+    let six = scale.ticks(target: 6, axisLength: 400, orientation: .horizontal, measuring: measurer)
+    #expect(six.map(\.value) == [0, 20, 40, 60, 80, 100])
+
+    let five = scale.ticks(target: 5, axisLength: 400, orientation: .horizontal, measuring: measurer)
+    #expect(five.count == 5)
+    #expect(five.map(\.value).allSatisfy { $0.truncatingRemainder(dividingBy: 20) == 0 })
 }
 
 @Test
 func labelPrecisionFollowsTheStepNotTheValues() {
     let scale = LinearScale(domain: 0...1)
-    let labels = scale.ticks(target: 4, axisLength: 400, measuring: FixedWidth()).map(\.label)
+    let labels = scale.ticks(target: 4, axisLength: 400, orientation: .horizontal, measuring: measurer).map(\.label)
     #expect(labels.first == "0.00")
     #expect(labels.contains("0.25"))
 }
@@ -60,8 +65,8 @@ func labelPrecisionFollowsTheStepNotTheValues() {
 @Test
 func labelCountIsCutToWhatTheAxisCanPhysicallyHold() {
     let scale = LinearScale(domain: 0...1_000_000)
-    let wide = scale.ticks(target: 10, axisLength: 1_200, measuring: FixedWidth()).count
-    let narrow = scale.ticks(target: 10, axisLength: 120, measuring: FixedWidth()).count
+    let wide = scale.ticks(target: 10, axisLength: 1_200, orientation: .horizontal, measuring: measurer).count
+    let narrow = scale.ticks(target: 10, axisLength: 120, orientation: .horizontal, measuring: measurer).count
     #expect(narrow < wide)
     #expect(narrow >= 2)
 }
@@ -69,7 +74,7 @@ func labelCountIsCutToWhatTheAxisCanPhysicallyHold() {
 @Test
 func negativeZeroNeverReachesALabel() {
     let scale = LinearScale(domain: -1...1)
-    let labels = scale.ticks(target: 4, axisLength: 400, measuring: FixedWidth()).map(\.label)
+    let labels = scale.ticks(target: 4, axisLength: 400, orientation: .horizontal, measuring: measurer).map(\.label)
     #expect(labels.contains("-0") == false)
     #expect(labels.contains("-0.0") == false)
 }

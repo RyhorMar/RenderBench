@@ -36,8 +36,8 @@ func twoConsumersSeeTheSameFrameNumber() {
 
     var left: [UInt64] = []
     var right: [UInt64] = []
-    clock.subscribe { left.append($0.frameID) }
-    clock.subscribe { right.append($0.frameID) }
+    _ = clock.subscribe { left.append($0.frameID) }
+    _ = clock.subscribe { right.append($0.frameID) }
 
     for step in 1...5 {
         ticker.fire(at: Double(step) / 120, target: Double(step + 1) / 120)
@@ -52,7 +52,7 @@ func frameNumbersAreAssignedByTheClockNotBySource() {
     let ticker = ManualTicker()
     let clock = FrameClock(source: ticker)
     var seen: [UInt64] = []
-    clock.subscribe { seen.append($0.frameID) }
+    _ = clock.subscribe { seen.append($0.frameID) }
 
     // The source reports zero for every tick; numbering is the clock's job precisely so that all
     // consumers agree even when the source cannot count.
@@ -85,10 +85,53 @@ func timestampsArePassedThroughUnchanged() {
     let ticker = ManualTicker()
     let clock = FrameClock(source: ticker)
     var last: FrameTick?
-    clock.subscribe { last = $0 }
+    _ = clock.subscribe { last = $0 }
 
     ticker.fire(at: 12.5, target: 12.508_333)
     #expect(last?.timestamp == 12.5)
     #expect(last?.targetTimestamp == 12.508_333)
     #expect(clock.latest == last)
+}
+
+/// Registration order, not hash order. Two charts on one clock touching a shared provider in an
+/// order that varies between launches would undercut the identical-work claim the clock exists for.
+@Test @MainActor
+func observersAreCalledInRegistrationOrder() {
+    let ticker = ManualTicker()
+    let clock = FrameClock(source: ticker)
+    var order: [Int] = []
+    var tokens: [FrameClock.Token] = []
+    for index in 0..<12 {
+        tokens.append(clock.subscribe { _ in order.append(index) })
+    }
+
+    ticker.fire(at: 0, target: 0.008)
+    #expect(order == Array(0..<12))
+
+    for token in tokens { clock.unsubscribe(token) }
+    #expect(clock.observerCount == 0)
+}
+
+/// Unsubscribing from inside a callback must take effect for the *next* tick, and must not stop
+/// the source while the current fan-out is still running.
+@Test @MainActor
+func unsubscribingFromInsideACallbackIsSafe() {
+    let ticker = ManualTicker()
+    let clock = FrameClock(source: ticker)
+    var firstCalls = 0
+    var secondCalls = 0
+
+    var firstToken: FrameClock.Token?
+    firstToken = clock.subscribe { _ in
+        firstCalls += 1
+        if let token = firstToken { clock.unsubscribe(token) }
+    }
+    let secondToken = clock.subscribe { _ in secondCalls += 1 }
+
+    ticker.fire(at: 0, target: 0.008)
+    ticker.fire(at: 0.008, target: 0.016)
+
+    #expect(firstCalls == 1)
+    #expect(secondCalls == 2)
+    clock.unsubscribe(secondToken)
 }
