@@ -19,12 +19,15 @@ func fixtureMatchesItsStatedPercentiles() {
     #expect(values.max() == PercentileFixture.expectedMaxNs)
 }
 
-/// The tail is the reason the fixture exists: a mean over this vector reads as comfortable while
-/// one frame in a hundred misses a 120 Hz budget by a factor of four.
+/// The tail is the reason the fixture exists. A mean understates it by more than a factor of
+/// three, and the median hides it entirely — which is why the results format publishes p99 and max
+/// alongside p50 rather than a single average.
 @Test
-func fixtureHasATailAMeanWouldHide() {
+func fixtureHasATailThatOnlyThePercentilesReport() {
     let values = PercentileFixture.frameDurationsNs
     let mean = values.reduce(UInt64(0), +) / UInt64(values.count)
-    #expect(mean < 8_300_000)
+
+    #expect(PercentileFixture.expectedP50Ns < 8_300_000)
+    #expect(mean < PercentileFixture.expectedP99Ns / 3)
     #expect(PercentileFixture.expectedP99Ns > 8_300_000 * 3)
 }

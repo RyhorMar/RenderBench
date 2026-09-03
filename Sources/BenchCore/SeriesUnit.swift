@@ -18,7 +18,7 @@ public struct Quantity: RawRepresentable, Hashable, Sendable, Codable {
 /// scale and a shift. A purely multiplicative model gets both wrong and gets them wrong quietly.
 ///
 /// `value_in_base = value * scale + offset`
-public struct Unit: Sendable, Hashable, Codable {
+public struct SeriesUnit: Sendable, Hashable, Codable {
     /// Symbol as it appears on an axis label: `psig`, `°C`, `m³/d`.
     public let symbol: String
     /// What this unit measures. Conversions across quantities are refused, not scaled.
@@ -49,7 +49,7 @@ public struct Unit: Sendable, Hashable, Codable {
     ///
     /// - Throws: ``ChartError/incompatibleUnits(from:to:)`` when the units measure different
     ///   quantities. This is the check that stops a pressure being rendered on a temperature axis.
-    public func convert(_ value: Double, to target: Unit) throws(ChartError) -> Double {
+    public func convert(_ value: Double, to target: SeriesUnit) throws(ChartError) -> Double {
         guard quantity == target.quantity else {
             throw ChartError.incompatibleUnits(from: self, to: target)
         }
@@ -58,23 +58,23 @@ public struct Unit: Sendable, Hashable, Codable {
     }
 }
 
-extension Unit {
+extension SeriesUnit {
     /// Base unit of pressure here: absolute pounds per square inch.
-    public static let psia = Unit(symbol: "psia", quantity: .pressure, scale: 1, offset: 0)
+    public static let psia = SeriesUnit(symbol: "psia", quantity: .pressure, scale: 1, offset: 0)
     /// Gauge pressure — the same scale shifted by one standard atmosphere.
-    public static let psig = Unit(symbol: "psig", quantity: .pressure, scale: 1, offset: 14.696)
-    public static let bar = Unit(symbol: "bar", quantity: .pressure, scale: 14.503_773_773_022_1, offset: 0)
+    public static let psig = SeriesUnit(symbol: "psig", quantity: .pressure, scale: 1, offset: 14.696)
+    public static let bar = SeriesUnit(symbol: "bar", quantity: .pressure, scale: 14.503_773_773_022_1, offset: 0)
 
     /// Base unit of temperature here: degrees Celsius.
-    public static let celsius = Unit(symbol: "°C", quantity: .temperature, scale: 1, offset: 0)
-    public static let fahrenheit = Unit(
+    public static let celsius = SeriesUnit(symbol: "°C", quantity: .temperature, scale: 1, offset: 0)
+    public static let fahrenheit = SeriesUnit(
         symbol: "°F",
         quantity: .temperature,
         scale: 5.0 / 9.0,
         offset: -32.0 * 5.0 / 9.0
     )
 
-    public static let cubicMetresPerDay = Unit(symbol: "m³/d", quantity: .volumetricRate, scale: 1, offset: 0)
-    public static let fraction = Unit(symbol: "", quantity: .dimensionless, scale: 1, offset: 0)
-    public static let molesPerLitre = Unit(symbol: "mol/L", quantity: .concentration, scale: 1, offset: 0)
+    public static let cubicMetresPerDay = SeriesUnit(symbol: "m³/d", quantity: .volumetricRate, scale: 1, offset: 0)
+    public static let fraction = SeriesUnit(symbol: "", quantity: .dimensionless, scale: 1, offset: 0)
+    public static let molesPerLitre = SeriesUnit(symbol: "mol/L", quantity: .concentration, scale: 1, offset: 0)
 }

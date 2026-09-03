@@ -16,7 +16,13 @@ public struct TimeScale: AxisScale {
     public let secondsFromGMT: Int
 
     /// Clock divisions labels may fall on, in seconds.
+    ///
+    /// Starts below a second because the reference chart's shortest window is one second: with a
+    /// one-second floor that window gets two labels, which is an axis with endpoints rather than
+    /// an axis. Tenths are still divisions a reader recognises; hundredths are not, so the ladder
+    /// stops there.
     static let ladder: [Double] = [
+        0.1, 0.2, 0.5,
         1, 2, 5, 10, 15, 30,
         60, 120, 300, 600, 900, 1_800,
         3_600, 7_200, 10_800, 21_600, 43_200,
@@ -86,6 +92,10 @@ public struct TimeScale: AxisScale {
         let minutes = (secondOfDay % 3_600) / 60
         let seconds = secondOfDay % 60
 
+        if step < 1 {
+            let fraction = value + Double(offset) - Double(total)
+            return String(format: "%02d:%02d.%01d", minutes, seconds, Int(fraction * 10))
+        }
         if step < 60 {
             return String(format: "%02d:%02d:%02d", hours, minutes, seconds)
         }

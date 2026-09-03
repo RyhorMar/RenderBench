@@ -6,13 +6,13 @@
 public enum ChartError: Error, Sendable, Equatable {
     /// Downsampling was asked to average a quantity that must not be averaged — API gravity, a
     /// ratio on mass, anything whose mean is not the mean of the thing it describes.
-    case nonAveragable(unit: Unit)
+    case nonAveragable(unit: SeriesUnit)
 
     /// A scale was built over a domain with no extent, so no projection is defined.
     case emptyDomain
 
     /// A conversion was requested between units measuring different quantities.
-    case incompatibleUnits(from: Unit, to: Unit)
+    case incompatibleUnits(from: SeriesUnit, to: SeriesUnit)
 
     /// A shader failed to build. `message` rather than the underlying error because this type is
     /// `Sendable` and `any Error` is not; the text is what a caller can log or display anyway.

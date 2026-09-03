@@ -1,4 +1,5 @@
 import BenchCore
+import Foundation
 import BenchScales
 import Testing
 @testable import BenchDownsampling
@@ -6,7 +7,7 @@ import Testing
 private func series(
     _ values: [Double],
     step: Double = 1,
-    unit: Unit = .psig
+    unit: SeriesUnit = .psig
 ) -> ArrayProvider {
     let samples = values.enumerated().map { Sample(carrier: Double($0.offset) * step, value: $0.element) }
     return ArrayProvider([samples], metadata: [SeriesMetadata(name: "S", unit: unit)])
@@ -127,7 +128,7 @@ func shortInputIsPassedThroughUnchanged() throws {
 /// extrema, but not by LTTB, which weighs a bucket average.
 @Test
 func averagingPolicyIsRefusedOnANonAveragableQuantity() throws {
-    let gravity = Unit(
+    let gravity = SeriesUnit(
         symbol: "°API",
         quantity: .dimensionless,
         scale: 1,

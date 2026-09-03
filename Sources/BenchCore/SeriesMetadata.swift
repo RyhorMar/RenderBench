@@ -15,7 +15,7 @@ public struct SeriesMetadata: Sendable, Equatable, Codable {
     /// Display name, used on the axis and in the accessibility description.
     public var name: String
     /// Unit the values are expressed in.
-    public var unit: Unit
+    public var unit: SeriesUnit
     /// Range the instrument can actually report, when known. Values outside it are suspect and
     /// are counted rather than clipped.
     public var validRange: ClosedRange<Double>?
@@ -24,7 +24,7 @@ public struct SeriesMetadata: Sendable, Equatable, Codable {
 
     public init(
         name: String,
-        unit: Unit,
+        unit: SeriesUnit,
         validRange: ClosedRange<Double>? = nil,
         provenance: Provenance = .measured
     ) {
