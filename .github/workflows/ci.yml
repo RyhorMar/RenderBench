@@ -10,100 +10,46 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # Fastest available failure signal: the data layers are Foundation-only, so they build and test
-  # on the runner host with no simulator involved. This job is not authoritative — it cannot see
-  # the iOS-only settings and it never compiles a shader. The `ios` job below is.
-  host:
+  # One entry point, the same one a developer runs. A pipeline that builds differently from the
+  # machine it is meant to protect eventually disagrees with it, and the disagreement always
+  # surfaces at the worst moment.
+  ci:
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
 
-      # Not pinned yet on purpose. The first run records what the image actually provides, and
-      # the version is pinned in a follow-up commit against those facts rather than against a
-      # guess about the image contents.
+      # Not pinned yet on purpose: the first run records what the image actually provides, and the
+      # version is pinned in a follow-up commit against those facts rather than against a guess.
       - name: Toolchain versions
         run: |
           xcodebuild -version
           swift --version
-          ls /Applications | grep -i '^Xcode' || true
+          xcodegen --version
 
-      - name: Build
-        run: swift build -v
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: "3.3"
+          bundler-cache: false
 
-      - name: Test
-        run: swift test
-
-  # The layering rule has no other enforcement: SwiftPM does not restrict which system frameworks
-  # a target may import, so "the core has no UI dependencies" is worth exactly as much as this job.
-  dependency-rules:
-    runs-on: macos-26
-    steps:
-      - uses: actions/checkout@v4
-      - name: Check imports
-        run: swift run CheckImports
-
-  # The real target platform. Neither the scheme name nor the simulator is hardcoded: device
-  # names change between runner images, and a pinned name is a guaranteed future failure.
-  ios:
-    runs-on: macos-26
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Discover scheme
+      - name: Install tools
         run: |
-          xcodebuild -list
-          SCHEME=$(xcodebuild -list -json | python3 -c '
-import json, sys
-data = json.load(sys.stdin)
-# A package directory reports itself under "workspace" or "project" depending on the Xcode
-# version; take whichever container actually carries schemes.
-schemes = []
-for key in ("workspace", "project"):
-    schemes = data.get(key, {}).get("schemes", []) or schemes
-if not schemes:
-    for value in data.values():
-        if isinstance(value, dict) and value.get("schemes"):
-            schemes = value["schemes"]
-            break
-if not schemes:
-    sys.exit("no schemes exposed by this package")
-sys.stderr.write("schemes: %s\n" % schemes)
-print(schemes[0])
-')
-          echo "SCHEME=$SCHEME" >> "$GITHUB_ENV"
+          brew install xcodegen
+          gem install fastlane --no-document
 
-      - name: Pick a simulator
-        run: |
-          UDID=$(xcrun simctl list devices available -j | python3 -c '
-import json, sys
-best = None
-for runtime, devices in json.load(sys.stdin)["devices"].items():
-    if "iOS" not in runtime:
-        continue
-    for d in devices:
-        if d.get("isAvailable") and "iPhone" in d["name"]:
-            best = (runtime, d["name"], d["udid"])
-if best is None:
-    sys.exit("no available iPhone simulator on this image")
-sys.stderr.write("using %s on %s\n" % (best[1], best[0]))
-print(best[2])
-')
-          echo "SIM_UDID=$UDID" >> "$GITHUB_ENV"
+      # Builds the package, runs the tests, checks the layering rule, generates the demo project
+      # and builds it for a simulator.
+      - name: fastlane ci
+        env:
+          LC_ALL: en_US.UTF-8
+          LANG: en_US.UTF-8
+        run: fastlane ci
 
-      - name: Build for iOS Simulator
-        run: |
-          xcodebuild build \
-            -scheme "$SCHEME" \
-            -destination "id=$SIM_UDID" \
-            -configuration Debug \
-            -resultBundlePath build.xcresult
-
-      # Compiler diagnostics as data rather than scraped log text. Runs on failure too: a broken
-      # build is exactly when the machine-readable report is worth having.
       - name: Export build results
         if: always()
         run: |
-          xcrun xcresulttool get build-results --path build.xcresult --format json > build-results.json || true
+          find Demo/.build-demo -name '*.xcresult' -maxdepth 4 -print0 \
+            | xargs -0 -I{} xcrun xcresulttool get build-results --path {} --format json \
+            > build-results.json || true
           wc -c build-results.json || true
 
       - uses: actions/upload-artifact@v4

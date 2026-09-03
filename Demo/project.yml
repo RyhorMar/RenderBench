@@ -1,0 +1,65 @@
+# The Xcode project is generated, not committed.
+#
+# SwiftPM has no product type for an iOS application, so a project file is unavoidable — but a
+# checked-in pbxproj is a binary-shaped text file that merges badly and drifts from the manifest
+# without anyone noticing. Generating it from this file keeps the target definition reviewable and
+# makes "the demo builds" reproducible from a clean checkout: `xcodegen generate`.
+name: RenderBenchDemo
+
+options:
+  bundleIdPrefix: dev.renderbench
+  deploymentTarget:
+    iOS: "26.0"
+  createIntermediateGroups: true
+  minimumXcodeGenVersion: "2.42.0"
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    SWIFT_TREAT_WARNINGS_AS_ERRORS: YES
+    ENABLE_USER_SCRIPT_SANDBOXING: YES
+    DEAD_CODE_STRIPPING: YES
+
+packages:
+  RenderBench:
+    path: ..
+
+targets:
+  RenderBenchDemo:
+    type: application
+    platform: iOS
+    sources:
+      - path: Sources
+    settings:
+      base:
+        INFOPLIST_FILE: Info.plist
+        PRODUCT_BUNDLE_IDENTIFIER: dev.renderbench.demo
+        PRODUCT_NAME: RenderBenchDemo
+        TARGETED_DEVICE_FAMILY: "1,2"
+        CODE_SIGNING_ALLOWED: NO
+    dependencies:
+      - package: RenderBench
+        product: BenchCore
+      - package: RenderBench
+        product: BenchScales
+      - package: RenderBench
+        product: BenchDownsampling
+      - package: RenderBench
+        product: BenchGenerators
+      - package: RenderBench
+        product: BenchRuntime
+      - package: RenderBench
+        product: CanvasBackend
+
+schemes:
+  RenderBenchDemo:
+    build:
+      targets:
+        RenderBenchDemo: all
+    run:
+      config: Debug
+    profile:
+      config: Release
+    archive:
+      config: Release

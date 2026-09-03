@@ -4,3 +4,12 @@
 DerivedData/
 *.xcuserdatad
 *.xcresult
+
+# Generated from Demo/project.yml by XcodeGen. Committing it would put a file that merges badly
+# and drifts from the manifest into every review.
+Demo/*.xcodeproj
+Demo/.build-demo/
+
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/test_output

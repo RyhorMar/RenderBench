@@ -1,0 +1,57 @@
+# Lanes are the single definition of "does this build". CI calls the same ones a developer does,
+# so a green pipeline and a green machine cannot mean different things.
+
+default_platform(:ios)
+
+DEMO_PROJECT = "Demo/RenderBenchDemo.xcodeproj"
+DEMO_SCHEME = "RenderBenchDemo"
+
+platform :ios do
+  desc "Regenerate the demo project from Demo/project.yml"
+  lane :generate do
+    Dir.chdir("../Demo") { sh("xcodegen", "generate") }
+  end
+
+  desc "Build and test the package on the host — the fastest failure signal available"
+  lane :package do
+    sh("swift", "build", "--package-path", "..")
+    sh("swift", "test", "--package-path", "..")
+  end
+
+  desc "Check the layering rule. Nothing else enforces it: SwiftPM does not restrict imports."
+  lane :imports do
+    sh("swift", "run", "--package-path", "..", "CheckImports", File.expand_path("..", Dir.pwd))
+  end
+
+  desc "Build the demo for a simulator"
+  lane :demo do
+    generate
+    xcodebuild(
+      project: DEMO_PROJECT,
+      scheme: DEMO_SCHEME,
+      configuration: "Debug",
+      destination: "generic/platform=iOS Simulator",
+      build: true,
+      derivedDataPath: "Demo/.build-demo"
+    )
+  end
+
+  desc "Build the demo, install it on a booted simulator and launch it"
+  lane :run_demo do
+    demo
+    udid = sh("xcrun", "simctl", "list", "devices", "booted", "-j", log: false)
+    UI.user_error!("no booted simulator — run `xcrun simctl boot <device>` first") unless udid.include?("Booted")
+    app = "Demo/.build-demo/Build/Products/Debug-iphonesimulator/#{DEMO_SCHEME}.app"
+    Dir.chdir("..") do
+      sh("xcrun", "simctl", "install", "booted", app)
+      sh("xcrun", "simctl", "launch", "booted", "dev.renderbench.demo")
+    end
+  end
+
+  desc "Everything CI runs"
+  lane :ci do
+    package
+    imports
+    demo
+  end
+end
