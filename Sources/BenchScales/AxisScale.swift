@@ -52,5 +52,12 @@ public protocol AxisScale: Sendable {
     /// Inverse of ``map(_:)`` for values inside the domain.
     func invert(_ normalised: Double) -> Double
     /// Ticks for the current domain, aiming for `target` labels without letting them collide.
-    func ticks(target: Int, measuring: some TextMeasuring) -> [Tick]
+    ///
+    /// - Parameters:
+    ///   - target: Labels the caller would like. Treated as an upper bound, never a guarantee.
+    ///   - axisLength: Length of the axis in points. Required: collision avoidance is arithmetic
+    ///     on measured text width against available length, and without the length the measurer
+    ///     is decoration.
+    ///   - measuring: Supplies rendered text width in the caller's font.
+    func ticks(target: Int, axisLength: Double, measuring: some TextMeasuring) -> [Tick]
 }
