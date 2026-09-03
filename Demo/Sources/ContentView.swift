@@ -8,6 +8,9 @@ struct ContentView: View {
     // aggregated across scenes and reports active while this one is not.
     @Environment(\.scenePhase) private var scenePhase
     @Environment(\.colorScheme) private var colorScheme
+    /// Name of the last file written, shown on the button so the user knows what to look for in
+    /// Files. Deliberately not a success alert: an export is not an event worth interrupting for.
+    @State private var exportedFile: String?
 
     var body: some View {
         VStack(spacing: 12) {
@@ -30,6 +33,26 @@ struct ContentView: View {
     }
 
     private var header: some View {
+        HStack(alignment: .firstTextBaseline) {
+            titles
+            Spacer()
+            exportButton
+        }
+    }
+
+    private var exportButton: some View {
+        Button {
+            exportedFile = ResultExport.write(from: scene)
+        } label: {
+            Label(exportedFile ?? "Export", systemImage: "square.and.arrow.up")
+                .font(.caption)
+                .labelStyle(.titleAndIcon)
+        }
+        .buttonStyle(.bordered)
+        .disabled(scene.statistics == nil)
+    }
+
+    private var titles: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text("RenderBench")
                 .font(.headline)

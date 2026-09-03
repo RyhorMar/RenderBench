@@ -30,6 +30,21 @@ final class ChartScene {
     private(set) var droppedFrames: UInt64 = 0
     private(set) var observedHz: Double = 0
 
+    /// When the current run began, and the thermal state then. Both come from the pipeline, which
+    /// records them at the run's start rather than at the application's launch.
+    var startedAt: Date { pipeline.runStartedAt }
+    var thermalStateAtStart: ThermalState { pipeline.thermalStateAtStart }
+
+    /// Series currently on screen.
+    var seriesCount: Int { streams.count }
+
+    /// Samples actually held per series right now.
+    ///
+    /// The count the ring holds, not the capacity it was built with. Before the window has filled
+    /// those differ, and a results file that reported the capacity would overstate the load the
+    /// measurement ran at.
+    var pointsPerSeries: Int { provider.series.first?.count ?? 0 }
+
     /// Which signal is on screen.
     ///
     /// No `didSet` here: the `@Observable` macro rewrites stored properties into accessors, and a
@@ -45,7 +60,7 @@ final class ChartScene {
     /// previous policy describes a different picture, and drawing it produces one frame of the old
     /// reduction inside the new one.
     var policy: DownsamplePolicy = .minMax {
-        didSet { if policy != oldValue { epoch &+= 1 } }
+        didSet { if policy != oldValue { pipeline.invalidateConfiguration() } }
     }
     var isRunning = true
     var chartSize: CGSize = .zero
@@ -54,7 +69,7 @@ final class ChartScene {
     let windowSeconds: Double = 10
 
     private let metrics = MetricsSink(capacity: 1_200)
-    private let slot = FrameSlot()
+    private var pipeline = FramePipeline(windowSeconds: 10, sampleRateHz: 100)
     private var clock: FrameClock?
     private var ticker: DisplayLinkTicker?
     private var subscription: FrameClock.Token?
@@ -64,8 +79,6 @@ final class ChartScene {
     private var streams: [SignalStream] = []
     private var sourceRateHz: Double = 100
     private var yDomain: ClosedRange<Double> = -1...1
-    private var elapsed: Double = 0
-    private var epoch: UInt64 = 1
     private var lastTickTimestamp: Double?
 
     init() {
@@ -101,9 +114,6 @@ final class ChartScene {
     /// Rebuilds the series set for the current scenario and bumps the epoch, so any frame
     /// prepared under the previous configuration is discarded rather than drawn.
     func rebuild() {
-        epoch &+= 1
-        elapsed = 0
-
         let signals: [any Signal]
         switch scenario {
         case .eightSeries:
@@ -140,24 +150,17 @@ final class ChartScene {
         metrics.removeAll()
         framesDrawn = 0
         droppedFrames = 0
-        prime()
+
+        pipeline = FramePipeline(windowSeconds: windowSeconds, sampleRateHz: sourceRateHz)
+        pipeline.beginRun()
+        produce(upTo: pipeline.prime())
     }
 
-    /// Fills the window once so the first frame shows a chart rather than an empty axis.
-    private func prime() {
-        produce(seconds: windowSeconds)
-    }
-
-    private func produce(seconds: Double) {
-        // Time is banked first, unconditionally. Advancing it only when at least one whole sample
-        // is due discarded every frame shorter than a sample period, and at 100 Hz on a 120 Hz
-        // display that is *every* frame: the clock never moved and the chart froze while the
-        // overlay went on reporting 120 fps.
-        elapsed += seconds
-        let wanted = Int(elapsed * sourceRateHz)
-
+    /// Advances every stream to `count` samples. The count comes from the pipeline, which banks
+    /// time; a stream that is already there produces nothing.
+    private func produce(upTo count: Int) {
         for index in streams.indices {
-            streams[index].advance(to: wanted) { sample in
+            streams[index].advance(to: count) { sample in
                 provider.series[index].append(sample)
             }
         }
@@ -172,16 +175,12 @@ final class ChartScene {
         if let previous = lastTickTimestamp {
             let delta = tick.timestamp - previous
             if delta > 0 { observedHz = 1 / delta }
-            produce(seconds: delta)
         }
         lastTickTimestamp = tick.timestamp
 
-        let upper = elapsed
-        let window = max(0, upper - windowSeconds)...max(0.001, upper)
-        slot.publish(
-            FrameSnapshot(frameID: tick.frameID, epoch: epoch, window: window, pointCount: producedCount)
-        )
-        guard let snapshot = slot.take(epoch: epoch) else { return }
+        guard let plan = pipeline.advance(tick: tick) else { return }
+        produce(upTo: plan.samplesDue)
+        let snapshot = plan.snapshot
 
         let spec = LineChartSpec(
             series: Array(streams.indices),
@@ -191,7 +190,7 @@ final class ChartScene {
         let built = CanvasChartRenderer.buildFrame(
             provider: provider,
             spec: spec,
-            window: snapshot.window,
+            window: plan.window,
             yDomain: yDomain,
             size: chartSize,
             dark: isDark,
@@ -211,7 +210,7 @@ final class ChartScene {
         )
         frame = built
         framesDrawn &+= 1
-        droppedFrames = slot.counters.dropped
+        droppedFrames = pipeline.counters.dropped
         if framesDrawn % 10 == 0 { statistics = metrics.cpuStatistics() }
     }
 }
