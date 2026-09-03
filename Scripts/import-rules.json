@@ -42,6 +42,7 @@
         "Foundation",
         "Synchronization",
         "QuartzCore",
+        "CoreGraphics",
         "Metal",
         "os"
       ],

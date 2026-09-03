@@ -173,16 +173,9 @@ public final class CoreAnimationChartLayer: CALayer {
         }
     }
 
+    /// Colours come from the one shared helper, which names sRGB explicitly rather than falling
+    /// into Generic RGB — see ``PaletteColor/cgColor``.
     private func cgColour(_ colour: PaletteColor) -> CGColor {
-        // CGColor takes encoded sRGB; linear components here would darken every stroke, and the
-        // comparison against the Canvas backend would fail for a reason that has nothing to do
-        // with either rendering method.
-        let encoded = colour.encodedSRGB
-        return CGColor(
-            red: CGFloat(encoded.red),
-            green: CGFloat(encoded.green),
-            blue: CGFloat(encoded.blue),
-            alpha: 1
-        )
+        colour.cgColor
     }
 }

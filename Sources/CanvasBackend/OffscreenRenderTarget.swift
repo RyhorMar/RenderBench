@@ -167,16 +167,11 @@ public enum OffscreenRenderTarget {
         return CGImageDestinationFinalize(destination)
     }
 
-    /// `CGColor` interprets its components as **encoded** sRGB, so linear ones have to be
-    /// gamma-encoded on the way in. Handing it linear values darkens every colour, and the
-    /// reference image then looks nothing like the same chart on screen.
+    /// Colours come from the one shared helper, which names sRGB explicitly. An earlier version
+    /// built them with `CGColor(red:green:blue:alpha:)`, which is Generic RGB — every stroke
+    /// landed fifteen to twenty levels off, and both backends made the same mistake, so the
+    /// equivalence check between them stayed at zero difference throughout.
     private static func components(_ colour: PaletteColor) -> CGColor {
-        let encoded = colour.encodedSRGB
-        return CGColor(
-            red: CGFloat(encoded.red),
-            green: CGFloat(encoded.green),
-            blue: CGFloat(encoded.blue),
-            alpha: 1
-        )
+        colour.cgColor
     }
 }

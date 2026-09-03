@@ -196,28 +196,27 @@ func theRatioBarRejectsAFewLargeDifferencesOnItsOwn() {
     #expect(difference.isEquivalent() == false)
 }
 
-/// The bug that shipped in the first version of this target and was caught by looking at the
-/// image, not by a test: `CGColor` interprets its components as encoded sRGB, so passing linear
-/// ones darkens every stroke. Series 0 is drawn in sRGB 0x006BA6; passing its linear components
-/// instead would put blue at about 97 rather than 166.
+/// Colour, exactly. Series 0 is sRGB 0x006BA6, so every fully covered pixel of its stroke is
+/// B=166 G=107 R=0 and nothing else.
+///
+/// Two bugs hid behind a threshold here. Passing linear components darkened the stroke to about
+/// blue 97; building the colour with `CGColor(red:green:blue:alpha:)` — which is Generic RGB, not
+/// sRGB — shifted it to 181. A `> 150` bound passed for the second of those, and for a partially
+/// covered pixel of the first. An exact assertion on fully covered pixels admits neither.
 @Test
-func strokesAreDrawnInEncodedColourNotLinear() {
+func strokesAreDrawnInTheExactPaletteColour() {
     let pixels = render(zigzag(count: 4_000, rate: 400))
-    var brightestBlue = 0
-    var brightestGreen = 0
-    // Premultiplied BGRA, little-endian: bytes run blue, green, red, alpha.
-    //
-    // The threshold on red must be tight. A first version admitted anything under 200, which let
-    // partially covered pixels in — those blend towards white and reach a blue of 235 whatever
-    // the stroke colour, so the check passed with linear components too. Measured: with red under
-    // 20 the brightest blue is 186 when encoded correctly and about 97 when not.
-    for index in stride(from: 0, to: pixels.count, by: 4) {
-        guard pixels[index + 2] < 20 else { continue }
-        brightestBlue = max(brightestBlue, Int(pixels[index]))
-        brightestGreen = max(brightestGreen, Int(pixels[index + 1]))
+    var covered = 0
+    var wrong = 0
+    // Premultiplied BGRA, little-endian: bytes run blue, green, red, alpha. Red is zero for this
+    // colour, so red == 0 selects pixels the stroke covers completely — anything partially
+    // covered has blended some white in and carries a non-zero red.
+    for index in stride(from: 0, to: pixels.count, by: 4) where pixels[index + 2] == 0 {
+        covered += 1
+        if pixels[index] != 166 || pixels[index + 1] != 107 { wrong += 1 }
     }
-    #expect(brightestBlue > 150, "blue peaked at \(brightestBlue); linear components give ~97")
-    #expect(brightestGreen > 90, "green peaked at \(brightestGreen); linear components give ~38")
+    #expect(covered > 10_000, "only \(covered) fully covered pixels to judge")
+    #expect(wrong == 0, "\(wrong) of \(covered) covered pixels are not the palette colour")
 }
 
 /// Antialiasing is pinned on, and a comparison run without it would judge two backends on hard
