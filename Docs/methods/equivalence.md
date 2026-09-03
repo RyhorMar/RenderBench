@@ -91,3 +91,46 @@ for both the zigzag and the reference chart; a renderer given half the points is
 both bars; a few large differences fail on the ratio while clearing the area, and many small ones
 fail on the area; differences at or below tolerance are not counted; identical buffers report
 infinity and zero. The stored reference is checked for existence and format.
+
+## What changed when a second rasteriser arrived
+
+Everything above describes `ImageDifference`, which asks whether two images are the same to within
+eight parts in 255. That was the right question for exactly as long as every backend rasterised
+through Core Graphics. Two users of one rasteriser agree bit-for-bit, so the check passed — and a
+mistake they shared, such as building every stroke colour in the wrong colour space, passed with
+them.
+
+The Metal backend does not share it. Multisampling quantises coverage to a fixed number of steps
+where Core Graphics computes it analytically, so an edge pixel legitimately differs by far more
+than the tolerance. On the reference chart the two agree to 32.5 dB with a worst channel of 159 —
+and the difference is entirely in partially covered pixels: of the 1032 pixels Core Graphics filled
+at exactly a palette colour, **none** differ. A stroke two points wide centred on a whole
+coordinate, where no coverage is partial, comes out byte-identical.
+
+So `StructuralDifference` asks a different question: a pixel the reference was certain about must
+be filled the same way. Edges are where two rasterisers are allowed to disagree.
+
+The criterion was chosen by breaking a working renderer and measuring, not by picking a number
+today's code passes:
+
+| render | mismatches among 8188 certain pixels |
+|---|---|
+| correct | 0 |
+| one of eight series dropped | 979 |
+| shifted by one pixel | 7975 |
+| stroked at half width | 7037 |
+| stroked at double width | 139 |
+
+Checked by `aWrongRenderIsRejected` in `Tests/MetalBackendTests/MetalRenderTargetTests.swift`,
+which runs all four broken renders on every test run.
+
+A second measure, `mismatchesAwayFromEdges`, is reported and **is not a criterion** — the correct
+render scores 133 on it, because where eight curves overlap no neighbourhood is free of edges. It
+separates the cases too, but only with a threshold, and a threshold chosen to make today's code
+pass is not a check.
+
+One control that does **not** work, recorded so nobody rebuilds it: dropping every other sample.
+On smooth data the min/max reduction rebuilds the same envelope, so the corrupted input scores
+63.3 dB against the correct render's 32.5 — the broken picture looks more equivalent than the
+honest one. The zigzag signal already in this suite is the control that bites, because alternating
+extremes are what reduction cannot reconstruct.

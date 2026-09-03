@@ -1,0 +1,221 @@
+#if os(iOS)
+import BenchCore
+import BenchRuntime
+import Metal
+import MetalKit
+import SwiftUI
+import simd
+
+/// An `MTKView` that draws one prepared frame, and nothing else.
+///
+/// **It does not run `MTKView`'s display link.** `isPaused` and `enableSetNeedsDisplay` are both
+/// off, so the view draws only when the scene's clock says to. Left at its defaults the view would
+/// bring its own timer, and the backend would be measured against a different number of frames
+/// from the ones it is compared with — one tick per scene is an invariant of this project, not a
+/// preference.
+///
+/// Labels are not drawn here. Metal has no text, and a chart that needs axis labels either builds
+/// a glyph atlas or lets something else draw them; this composes a SwiftUI overlay, which is what
+/// the method actually costs in practice. The overlay is a separate view so that the per-frame
+/// body stays confined to the surface.
+public struct MetalChartView: View {
+    private let geometry: MetalChartGeometry
+    private let ticks: (x: [PlottedTick], y: [PlottedTick])
+    private let plot: PlotRect
+    private let chrome: ChartChrome
+    private let rasterTime: RasterTimeRecorder?
+    private let gpuTime: RasterTimeRecorder?
+
+    public init(
+        geometry: MetalChartGeometry,
+        plot: PlotRect,
+        xTicks: [PlottedTick],
+        yTicks: [PlottedTick],
+        chrome: ChartChrome = .light,
+        rasterTime: RasterTimeRecorder? = nil,
+        gpuTime: RasterTimeRecorder? = nil
+    ) {
+        self.geometry = geometry
+        self.plot = plot
+        self.ticks = (xTicks, yTicks)
+        self.chrome = chrome
+        self.rasterTime = rasterTime
+        self.gpuTime = gpuTime
+    }
+
+    public var body: some View {
+        ZStack {
+            MetalChartSurface(
+                geometry: geometry,
+                chrome: chrome,
+                rasterTime: rasterTime,
+                gpuTime: gpuTime
+            )
+            MetalChartLabels(plot: plot, xTicks: ticks.x, yTicks: ticks.y, chrome: chrome)
+        }
+    }
+}
+
+/// The drawing surface. Separated so that only this view reads the per-frame geometry.
+struct MetalChartSurface: UIViewRepresentable {
+    let geometry: MetalChartGeometry
+    let chrome: ChartChrome
+    let rasterTime: RasterTimeRecorder?
+    let gpuTime: RasterTimeRecorder?
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(chrome: chrome, rasterTime: rasterTime, gpuTime: gpuTime)
+    }
+
+    func makeUIView(context: Context) -> MTKView {
+        let view = MTKView(frame: .zero, device: context.coordinator.device)
+        view.colorPixelFormat = MetalRenderTarget.pixelFormat
+        view.sampleCount = Coordinator.sampleCount
+        view.isPaused = true
+        view.enableSetNeedsDisplay = false
+        // Nothing reads the drawable back, so the driver may keep it in whatever layout is
+        // fastest to render into.
+        view.framebufferOnly = true
+        view.delegate = context.coordinator
+        // A clear colour is set per pass by the renderer; this only covers the moment before the
+        // first frame exists.
+        view.clearColor = MTLClearColor(
+            red: chrome.background.red,
+            green: chrome.background.green,
+            blue: chrome.background.blue,
+            alpha: 1
+        )
+        return view
+    }
+
+    func updateUIView(_ view: MTKView, context: Context) {
+        context.coordinator.geometry = geometry
+        context.coordinator.chrome = chrome
+        // The scene's tick, arriving as a state change. `draw()` is synchronous and this is the
+        // only thing that calls it.
+        view.draw()
+    }
+
+    /// Holds what must survive a view update: the device, the renderer and its compiled shader.
+    ///
+    /// Rebuilding these per update would recompile the shader — 48 ms on an M3 Pro — inside what
+    /// is supposed to be a frame.
+    final class Coordinator: NSObject, MTKViewDelegate {
+        static let sampleCount = 4
+
+        let device: MTLDevice?
+        var geometry = MetalChartGeometry()
+        var chrome: ChartChrome
+        /// Set when a frame could not be encoded, so a blank chart has a reason attached to it.
+        private(set) var lastFailure: MetalRendererError?
+        private let renderer: MetalLineRenderer?
+        private let queue: MTLCommandQueue?
+        private let rasterTime: RasterTimeRecorder?
+        private let gpuTime: RasterTimeRecorder?
+
+        init(chrome: ChartChrome, rasterTime: RasterTimeRecorder?, gpuTime: RasterTimeRecorder?) {
+            self.chrome = chrome
+            self.rasterTime = rasterTime
+            self.gpuTime = gpuTime
+            let device = MTLCreateSystemDefaultDevice()
+            self.device = device
+            self.queue = device?.makeCommandQueue()
+            self.renderer = device.flatMap {
+                try? MetalLineRenderer(
+                    device: $0,
+                    pixelFormat: MetalRenderTarget.pixelFormat,
+                    sampleCount: Self.sampleCount
+                )
+            }
+        }
+
+        func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {}
+
+        func draw(in view: MTKView) {
+            guard let renderer, let queue,
+                  let descriptor = view.currentRenderPassDescriptor,
+                  let drawable = view.currentDrawable,
+                  let commandBuffer = queue.makeCommandBuffer() else { return }
+
+            // Timed with an explicit pair of readings rather than `measure`: the closure form
+            // erases the typed throw to `any Error`, and the point of typing it was to know that
+            // a draw failure is the only thing that can arrive here.
+            var encoded = false
+            let clock = ContinuousClock()
+            let started = clock.now
+            do {
+                try renderer.draw(
+                    geometry,
+                    viewportPixels: SIMD2<Float>(
+                        Float(view.drawableSize.width),
+                        Float(view.drawableSize.height)
+                    ),
+                    clearColour: chrome.background,
+                    descriptor: descriptor,
+                    in: commandBuffer
+                )
+                encoded = true
+            } catch {
+                lastFailure = error
+            }
+            let elapsed = clock.now - started
+            // A frame that failed to encode reports no time rather than a small one. The
+            // alternative is a backend that gets faster the more often it fails to draw.
+            if encoded { rasterTime?.record(nanoseconds: elapsed.nanoseconds) }
+
+            // The GPU's own clock, not the host's. It arrives after the frame that produced it and
+            // is collected on a later tick — the one column in this project that measures
+            // rasterisation directly rather than by subtraction.
+            if encoded, let gpuTime {
+                commandBuffer.addCompletedHandler { buffer in
+                    let seconds = buffer.gpuEndTime - buffer.gpuStartTime
+                    guard seconds > 0 else { return }
+                    gpuTime.record(nanoseconds: UInt64(seconds * 1_000_000_000))
+                }
+            }
+            if encoded { commandBuffer.present(drawable) }
+            commandBuffer.commit()
+        }
+    }
+}
+
+/// Axis labels, drawn by SwiftUI over the Metal surface.
+struct MetalChartLabels: View {
+    let plot: PlotRect
+    let xTicks: [PlottedTick]
+    let yTicks: [PlottedTick]
+    let chrome: ChartChrome
+
+    private static let labelFont = Font.system(size: 9, design: .monospaced)
+
+    var body: some View {
+        Canvas(opaque: false, rendersAsynchronously: false) { context, _ in
+            for tick in yTicks {
+                let y = plot.maxY - tick.position * plot.height
+                context.draw(
+                    context.resolve(label(tick.label)),
+                    at: CGPoint(x: plot.minX - 6, y: y),
+                    anchor: .trailing
+                )
+            }
+            for tick in xTicks {
+                let x = plot.minX + tick.position * plot.width
+                context.draw(
+                    context.resolve(label(tick.label)),
+                    at: CGPoint(x: x, y: plot.maxY + 10),
+                    anchor: .center
+                )
+            }
+        }
+        .allowsHitTesting(false)
+    }
+
+    private func label(_ text: String) -> Text {
+        Text(text)
+            .font(Self.labelFont)
+            .foregroundStyle(
+                Color(.sRGBLinear, red: chrome.label.red, green: chrome.label.green, blue: chrome.label.blue)
+            )
+    }
+}
+#endif

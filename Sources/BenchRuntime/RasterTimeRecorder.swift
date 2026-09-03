@@ -9,6 +9,10 @@ import Synchronization
 /// what this package published until now — reports path construction as the cost of a rendering
 /// method and omits the rendering.
 ///
+/// The GPU backend uses a second instance for the same shape of problem: a command buffer's start
+/// and end timestamps exist only once the GPU has finished with it, which is after the frame that
+/// submitted it has returned.
+///
 /// A one-deep slot rather than a callback, for the same reason the frame slot is one: writing
 /// observable state from inside a draw pass is how a render loop starts driving itself. The value
 /// is left here and picked up on the next tick, one frame late, which is stated rather than hidden.

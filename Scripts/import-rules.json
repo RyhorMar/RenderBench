@@ -194,6 +194,36 @@
         "CanvasBackend",
         "CoreAnimationBackend"
       ]
+    },
+    "Sources/MetalBackend": {
+      "system": [
+        "Foundation",
+        "Metal",
+        "MetalKit",
+        "QuartzCore",
+        "SwiftUI",
+        "UIKit",
+        "simd"
+      ],
+      "local": [
+        "BenchCore",
+        "BenchRuntime"
+      ]
+    },
+    "Tests/MetalBackendTests": {
+      "system": [
+        "Foundation",
+        "Metal",
+        "Testing",
+        "simd"
+      ],
+      "local": [
+        "BenchCore",
+        "BenchRuntime",
+        "BenchTestSupport",
+        "CanvasBackend",
+        "MetalBackend"
+      ]
     }
   }
 }

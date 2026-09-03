@@ -39,6 +39,7 @@ let package = Package(
         .library(name: "BenchTestSupport", targets: ["BenchTestSupport"]),
         .library(name: "CanvasBackend", targets: ["CanvasBackend"]),
         .library(name: "CoreAnimationBackend", targets: ["CoreAnimationBackend"]),
+        .library(name: "MetalBackend", targets: ["MetalBackend"]),
     ],
     targets: [
         // MARK: Layers
@@ -105,6 +106,15 @@ let package = Package(
             swiftSettings: strict
         ),
 
+        // Third of the nine, and the first that does not rasterise through Core Graphics. Its
+        // shader is compiled from source at startup rather than shipped as a `.metallib`:
+        // SwiftPM 6.2 does not compile `.metal` files at all — see `MetalShaderSource`.
+        .target(
+            name: "MetalBackend",
+            dependencies: ["BenchRuntime"],
+            swiftSettings: strict
+        ),
+
         // MARK: Tooling
 
         // The dependency rule is machine-checked because nothing else enforces it: SwiftPM does
@@ -152,6 +162,11 @@ let package = Package(
         .testTarget(
             name: "CanvasBackendTests",
             dependencies: ["CanvasBackend", "BenchTestSupport"],
+            swiftSettings: strictMainActor
+        ),
+        .testTarget(
+            name: "MetalBackendTests",
+            dependencies: ["MetalBackend", "CanvasBackend", "BenchTestSupport"],
             swiftSettings: strictMainActor
         ),
         .testTarget(

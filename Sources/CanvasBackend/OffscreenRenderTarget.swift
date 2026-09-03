@@ -14,12 +14,12 @@ import UniformTypeIdentifiers
 /// the colour space and the antialiasing. A comparison run at whatever size the window happened to
 /// be compares two different questions.
 public enum OffscreenRenderTarget {
-    /// Width in pixels of every comparison render.
-    public static let width = 1_024
-    /// Height in pixels of every comparison render.
-    public static let height = 768
+    /// Width in points of every comparison render.
+    public static let width = ComparisonImage.width
+    /// Height in points of every comparison render.
+    public static let height = ComparisonImage.height
     /// Bytes per pixel: 8-bit BGRA, premultiplied.
-    public static let bytesPerPixel = 4
+    public static let bytesPerPixel = ComparisonImage.bytesPerPixel
 
     /// Renders a frame and returns the raw premultiplied BGRA bytes.
     ///
