@@ -53,8 +53,13 @@ enforce, because only it is present while the run happens:
 
 ## What is published, and what is refused
 
-Published: nearest-rank p50, p95, p99 and max, separately for CPU and GPU; the missed-deadline
-ratio; the full environment.
+Published: nearest-rank p50, p95, p99 and max in three separate columns — `cpu` for preparation
+and geometry building, `raster` for the backend's own drawing, `gpu` for GPU execution — plus the
+missed-deadline ratio and the full environment.
+
+**The three are never added together into one frame time.** A backend that reports no `raster` and
+no `gpu` has not been measured as a rendering method: its drawing happened somewhere this process
+cannot see. Reading its `cpu` column as a frame cost is the mistake this format exists to prevent.
 
 **Refused as a comparison** unless all three hold: the equivalence check passed, `pointsDrawn`
 agrees between the two backends, and the confidence intervals on p95 do not overlap. Absent those,

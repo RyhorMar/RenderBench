@@ -142,3 +142,40 @@ func summaryOverAnEmptySinkReportsNothingRatherThanZero() {
     #expect(summary.gpu == nil)
     #expect(summary.missedDeadlineRatio == nil)
 }
+
+/// The three columns stay apart. A backend that cannot observe its own drawing reports no raster
+/// time, and that must read as absent rather than as zero — a zero would let its `cpu` column be
+/// mistaken for a frame cost.
+@Test
+func rasterTimeIsReportedSeparatelyAndIsAbsentWhenUnobserved() {
+    let sink = MetricsSink(capacity: 32)
+    for id in 1...10 {
+        sink.record(frame(UInt64(id), cpuNs: 2_000_000))
+    }
+    let withoutRaster = sink.summary(frameBudgetSeconds: 1.0 / 60.0)
+    #expect(withoutRaster.cpu?.p50Ns == 2_000_000)
+    #expect(withoutRaster.raster == nil)
+
+    sink.removeAll()
+    for id in 1...10 {
+        var metrics = frame(UInt64(id), cpuNs: 2_000_000)
+        metrics.rasterNs = 500_000
+        sink.record(metrics)
+    }
+    let withRaster = sink.summary(frameBudgetSeconds: 1.0 / 60.0)
+    #expect(withRaster.cpu?.p50Ns == 2_000_000, "the cpu column absorbed the raster time")
+    #expect(withRaster.raster?.p50Ns == 500_000)
+    #expect(withRaster.raster?.sampleCount == 10)
+}
+
+/// The two totals answer different questions and neither is allowed to masquerade as the other.
+@Test
+func theSubTotalAndTheTotalAreDistinct() {
+    var metrics = frame(1, cpuNs: 3_000_000)
+    #expect(metrics.cpuPrepareAndEncodeNs == 3_000_000)
+    #expect(metrics.cpuTotalNs == 3_000_000)
+
+    metrics.rasterNs = 1_000_000
+    #expect(metrics.cpuPrepareAndEncodeNs == 3_000_000, "the sub-total absorbed the raster time")
+    #expect(metrics.cpuTotalNs == 4_000_000)
+}

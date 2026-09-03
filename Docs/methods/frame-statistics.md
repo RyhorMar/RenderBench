@@ -29,6 +29,32 @@ of its own, so a HUD cannot contradict the results file it was meant to illustra
   windows.
 - An empty sink reports `nil`, never zero.
 
+## What a frame time is, and what these numbers are
+
+**Preparation plus geometry building is not a frame's cost, and this package reported it as one
+until the draw pass was measured at all.** For an immediate-mode backend the drawing happens inside
+a closure the view layer calls during its own render pass, after the code that prepared the frame
+has returned; for a retained-mode one the tessellation and compositing happen in the render server,
+in another process.
+
+So there are three columns, kept apart on purpose:
+
+| Column | What it covers | Absent when |
+|---|---|---|
+| `cpu` | windowing, reduction, projection, geometry building | never |
+| `raster` | the backend's own drawing | the backend cannot observe it — every retained-mode one |
+| `gpu` | GPU execution from the command buffer's timestamps | there is no GPU path |
+
+A backend with no `raster` and no `gpu` has not been measured as a rendering method at all. For
+those, `missedDeadlineRatio` and `presentedTime` are the only honest evidence that it holds a frame
+budget, and both are currently unavailable because nothing sets a presentation time — which is why
+this package still publishes no comparison.
+
+Measured on a simulator in debug, so not a measurement: eight series at 100 Hz gave preparation
+p50 2.53 ms against drawing p50 0.40 ms. Preparation dominating by six to one is worth confirming
+in release on a device before anyone reads the comparison table, because if it holds, a difference
+between two backends is a difference in a sixth of the frame.
+
 ## Why this method
 
 **Nearest-rank, with no interpolation.** The percentile of a sorted sample is the value at rank

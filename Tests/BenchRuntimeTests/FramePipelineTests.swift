@@ -141,3 +141,21 @@ func everyPlannedFrameIsAccountedForInTheCounters() {
     #expect(counters.dropped == 0)
     #expect(pipeline.framesPlanned == 50)
 }
+
+/// Carries a draw time out of a callback and hands it over once. A second take must report
+/// nothing, not the same frame again — a stale value read as fresh would make a stalled renderer
+/// look healthy.
+@Test
+func theRasterRecorderHandsOverEachRecordingOnce() {
+    let recorder = RasterTimeRecorder()
+    #expect(recorder.take() == nil)
+
+    recorder.record(nanoseconds: 1_234)
+    #expect(recorder.take() == 1_234)
+    #expect(recorder.take() == nil)
+
+    // The newest wins: a frame the collector missed is dropped, not queued.
+    recorder.record(nanoseconds: 1)
+    recorder.record(nanoseconds: 2)
+    #expect(recorder.take() == 2)
+}

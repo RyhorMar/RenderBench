@@ -4,33 +4,59 @@
   "description": "One measured run. The format is deliberately verbose about conditions and terse about numbers: a percentile takes one line, establishing that the percentile means anything takes a dozen. Required fields are required because a result missing any of them cannot be reproduced or compared, and a bench-guard job rejects such a file rather than storing it.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["run", "env", "cases"],
+  "required": [
+    "run",
+    "env",
+    "cases"
+  ],
   "properties": {
     "run": {
       "type": "object",
       "description": "What code produced these numbers, and when.",
       "additionalProperties": false,
-      "required": ["id", "startedAt", "gitSha", "gitDirty", "configuration", "swiftVersion"],
+      "required": [
+        "id",
+        "startedAt",
+        "gitSha",
+        "gitDirty",
+        "configuration",
+        "swiftVersion"
+      ],
       "properties": {
         "id": {
           "type": "string",
           "minLength": 1,
           "description": "Unique run id. The literal \"example\" marks the documented shape illustration; a file carrying it is refused under results/."
         },
-        "startedAt": { "type": "string", "format": "date-time" },
+        "startedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
         "gitSha": {
           "type": "string",
           "minLength": 1,
-          "not": { "const": "unknown" },
+          "not": {
+            "const": "unknown"
+          },
           "description": "Commit the measured binary was built from. A number that cannot be traced to a revision is not evidence of anything, so \"unknown\" is rejected as firmly as an absent field."
         },
         "gitDirty": {
           "type": "boolean",
           "description": "Whether the working tree had uncommitted changes. A dirty run is recorded, not refused — but the reader gets to know."
         },
-        "configuration": { "enum": ["debug", "release"] },
-        "swiftVersion": { "type": "string", "minLength": 1 },
-        "xcodeVersion": { "type": "string" }
+        "configuration": {
+          "enum": [
+            "debug",
+            "release"
+          ]
+        },
+        "swiftVersion": {
+          "type": "string",
+          "minLength": 1
+        },
+        "xcodeVersion": {
+          "type": "string"
+        }
       }
     },
     "env": {
@@ -52,19 +78,43 @@
           "minLength": 1,
           "description": "Hardware identifier as the kernel reports it, e.g. iPhone17,1. A marketing name is ambiguous across regions and storage tiers."
         },
-        "osVersion": { "type": "string", "minLength": 1 },
+        "osVersion": {
+          "type": "string",
+          "minLength": 1
+        },
         "isSimulator": {
           "type": "boolean",
           "description": "A simulator run is refused at publication: Metal is translated, there is no thermal envelope, and the display is not the device's."
         },
-        "maximumFramesPerSecond": { "type": "integer", "minimum": 1 },
-        "thermalStateAtStart": { "enum": ["nominal", "fair", "serious", "critical"] },
+        "maximumFramesPerSecond": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "thermalStateAtStart": {
+          "enum": [
+            "nominal",
+            "fair",
+            "serious",
+            "critical"
+          ]
+        },
         "thermalStateAtEnd": {
-          "enum": ["nominal", "fair", "serious", "critical"],
+          "enum": [
+            "nominal",
+            "fair",
+            "serious",
+            "critical"
+          ],
           "description": "Required at both ends. A run that begins nominal and ends serious measured two different machines, and only the pair says so."
         },
-        "lowPowerModeEnabled": { "type": "boolean" },
-        "batteryLevel": { "type": "number", "minimum": 0, "maximum": 1 }
+        "lowPowerModeEnabled": {
+          "type": "boolean"
+        },
+        "batteryLevel": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
       }
     },
     "cases": {
@@ -91,16 +141,49 @@
           "equivalence"
         ],
         "properties": {
-          "chartKind": { "type": "string", "minLength": 1 },
-          "backend": { "type": "string", "minLength": 1 },
-          "seriesCount": { "type": "integer", "minimum": 1 },
-          "pointsPerSeries": { "type": "integer", "minimum": 1 },
-          "refreshHz": { "type": "integer", "minimum": 1 },
-          "policy": { "enum": ["minMax", "lttb", "none"] },
-          "warmupFrames": { "type": "integer", "minimum": 0 },
-          "measuredFrames": { "type": "integer", "minimum": 1 },
-          "repeatIndex": { "type": "integer", "minimum": 1 },
-          "cpu": { "$ref": "#/$defs/percentiles" },
+          "chartKind": {
+            "type": "string",
+            "minLength": 1
+          },
+          "backend": {
+            "type": "string",
+            "minLength": 1
+          },
+          "seriesCount": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "pointsPerSeries": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "refreshHz": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "policy": {
+            "enum": [
+              "minMax",
+              "lttb",
+              "none"
+            ]
+          },
+          "warmupFrames": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "measuredFrames": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "repeatIndex": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "cpu": {
+            "$ref": "#/$defs/percentiles",
+            "description": "Preparation plus geometry building. NOT the frame's cost: a backend that cannot observe its own drawing reports none of it here, so this column compares between backends only as a sub-total."
+          },
           "gpu": {
             "$ref": "#/$defs/percentiles",
             "description": "Absent on a CPU-only backend, which has no GPU interval to report. Never zero: a zero would win every comparison it appeared in."
@@ -111,16 +194,30 @@
             "maximum": 1,
             "description": "Absent when nothing in the run could observe presentation. Unknowable is not the same as none."
           },
-          "pointsSubmitted": { "type": "integer", "minimum": 0 },
+          "pointsSubmitted": {
+            "type": "integer",
+            "minimum": 0
+          },
           "pointsDrawn": {
             "type": "integer",
             "minimum": 0,
             "description": "Divergence from pointsSubmitted means the backend bought its frame time by dropping work."
           },
-          "drawCalls": { "type": "integer", "minimum": 0 },
+          "drawCalls": {
+            "type": "integer",
+            "minimum": 0
+          },
           "equivalence": {
-            "enum": ["passed", "failed", "notChecked"],
+            "enum": [
+              "passed",
+              "failed",
+              "notChecked"
+            ],
             "description": "Whether the backend was shown to draw the same picture as the reference before its timings were compared. \"notChecked\" is its own value so that it can never be read as \"passed\"; a \"failed\" case makes the whole file unpublishable."
+          },
+          "raster": {
+            "$ref": "#/$defs/percentiles",
+            "description": "The backend's own rasterisation, where it could time it. Absent for a retained-mode backend, whose tessellation and compositing happen in the render server in another process - unobservable, and therefore absent rather than zero. Without this column and missedDeadlineRatio a row says nothing about whether a method holds a frame budget."
           }
         }
       }
@@ -131,13 +228,34 @@
       "type": "object",
       "description": "Nearest-rank percentiles in nanoseconds, over sampleCount frames. The definition is named rather than assumed: the nine definitions in common use disagree by a whole frame on a hundred-sample window.",
       "additionalProperties": false,
-      "required": ["sampleCount", "p50Ns", "p95Ns", "p99Ns", "maxNs"],
+      "required": [
+        "sampleCount",
+        "p50Ns",
+        "p95Ns",
+        "p99Ns",
+        "maxNs"
+      ],
       "properties": {
-        "sampleCount": { "type": "integer", "minimum": 1 },
-        "p50Ns": { "type": "integer", "minimum": 0 },
-        "p95Ns": { "type": "integer", "minimum": 0 },
-        "p99Ns": { "type": "integer", "minimum": 0 },
-        "maxNs": { "type": "integer", "minimum": 0 }
+        "sampleCount": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "p50Ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "p95Ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "p99Ns": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "maxNs": {
+          "type": "integer",
+          "minimum": 0
+        }
       }
     }
   }

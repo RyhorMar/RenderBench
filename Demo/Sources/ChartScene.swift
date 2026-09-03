@@ -26,6 +26,9 @@ enum Scenario: String, CaseIterable, Identifiable {
 final class ChartScene {
     private(set) var frame = CanvasFrame()
     private(set) var statistics: FrameStatistics?
+    /// Percentiles of the draw pass itself, separate from preparation. `nil` until a draw has
+    /// reported one.
+    private(set) var rasterStatistics: FrameStatistics?
     private(set) var framesDrawn: UInt64 = 0
     private(set) var droppedFrames: UInt64 = 0
     private(set) var observedHz: Double = 0
@@ -69,6 +72,10 @@ final class ChartScene {
     let windowSeconds: Double = 10
 
     private let metrics = MetricsSink(capacity: 1_200)
+    /// Carries the draw pass's own time out of the Canvas closure. Read on the next tick, one
+    /// frame late — which is stated rather than hidden, and is the only way an immediate-mode
+    /// backend's rasterisation can be timed at all.
+    let rasterTime = RasterTimeRecorder()
     private var pipeline = FramePipeline(windowSeconds: 10, sampleRateHz: 100)
     private var clock: FrameClock?
     private var ticker: DisplayLinkTicker?
@@ -202,6 +209,7 @@ final class ChartScene {
                 frameID: snapshot.frameID,
                 cpuPrepareNs: built.prepareNs,
                 cpuEncodeNs: built.encodeNs,
+                rasterNs: rasterTime.take(),
                 targetTimestamp: tick.targetTimestamp,
                 pointsSubmitted: built.pointsSubmitted,
                 pointsDrawn: built.pointsDrawn,
@@ -211,6 +219,9 @@ final class ChartScene {
         frame = built
         framesDrawn &+= 1
         droppedFrames = pipeline.counters.dropped
-        if framesDrawn % 10 == 0 { statistics = metrics.cpuStatistics() }
+        if framesDrawn % 10 == 0 {
+            statistics = metrics.cpuStatistics()
+            rasterStatistics = metrics.rasterStatistics()
+        }
     }
 }

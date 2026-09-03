@@ -1,4 +1,5 @@
 import BenchCore
+import BenchRuntime
 import SwiftUI
 
 /// Strokes a prepared frame. Holds no state and computes nothing.
@@ -8,26 +9,55 @@ import SwiftUI
 /// backend measurable as two separate numbers instead of one lump.
 public struct CanvasChartView: View {
     private let frame: CanvasFrame
+    private let recorder: RasterTimeRecorder?
+    private let background: Color
     private let axisColour: Color
     private let gridColour: Color
     private let labelColour: Color
 
+    /// - Parameter recorder: Collects how long the draw pass took. Without one, this backend
+    ///   reports no rasterisation time at all and its published frame cost is preparation plus
+    ///   path building — which is not a rendering method's cost.
     public init(
         frame: CanvasFrame,
+        recorder: RasterTimeRecorder? = nil,
+        background: Color = Color(white: 0.99),
         axisColour: Color = .secondary,
         gridColour: Color = Color.secondary.opacity(0.18),
         labelColour: Color = .secondary
     ) {
         self.frame = frame
+        self.recorder = recorder
+        self.background = background
         self.axisColour = axisColour
         self.gridColour = gridColour
         self.labelColour = labelColour
     }
 
     public var body: some View {
-        Canvas(opaque: false, rendersAsynchronously: false) { context, _ in
-            let plot = frame.plotRect
-            guard plot.width > 1, plot.height > 1 else { return }
+        // Opaque, and the background is filled here rather than by a modifier behind it. A
+        // non-opaque canvas is cleared to transparent and composited over whatever is underneath
+        // every frame — up to a million pixels at 3x — for an alpha channel this design never
+        // reads. Opacity obliges the drawing to cover every pixel, which the fill does.
+        Canvas(opaque: true, rendersAsynchronously: false) { context, size in
+            let clock = ContinuousClock()
+            let elapsed = clock.measure { draw(in: &context, size: size) }
+            recorder?.record(nanoseconds: elapsed.nanoseconds)
+        }
+    }
+
+    /// The drawing itself, timed by the caller.
+    ///
+    /// Split out so the measurement covers the rasterisation and nothing else — and so that what
+    /// is being timed is visible at the call site rather than buried in a closure.
+    private func draw(in context: inout GraphicsContext, size: CGSize) {
+        context.fill(Path(CGRect(origin: .zero, size: size)), with: .color(background))
+        drawContents(&context)
+    }
+
+    private func drawContents(_ context: inout GraphicsContext) {
+        let plot = frame.plotRect
+        guard plot.width > 1, plot.height > 1 else { return }
 
             var grid = Path()
             for tick in frame.yTicks {
@@ -69,7 +99,6 @@ public struct CanvasChartView: View {
                     anchor: .center
                 )
             }
-        }
     }
 
     private func label(_ text: String) -> Text {

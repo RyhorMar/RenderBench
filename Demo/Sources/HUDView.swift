@@ -11,10 +11,16 @@ struct HUDView: View {
     var body: some View {
         VStack(alignment: .trailing, spacing: 2) {
             row("fps", String(format: "%.0f", scene.observedHz))
+            // Two columns, not one. "prep" is preparation plus geometry building; "draw" is the
+            // rasterisation the backend could time. Adding them into a single figure and calling
+            // it the frame cost is what this overlay did until the draw pass was measured at all.
             if let statistics = scene.statistics {
-                row("p50", milliseconds(statistics.p50Ns))
-                row("p95", milliseconds(statistics.p95Ns))
-                row("p99", milliseconds(statistics.p99Ns))
+                row("prep p50", milliseconds(statistics.p50Ns))
+                row("prep p95", milliseconds(statistics.p95Ns))
+            }
+            if let raster = scene.rasterStatistics {
+                row("draw p50", milliseconds(raster.p50Ns))
+                row("draw p95", milliseconds(raster.p95Ns))
             }
             row("points", "\(scene.frame.pointsDrawn)")
             row("dropped", "\(scene.droppedFrames)")

@@ -85,7 +85,12 @@ public final class MetricsSink: Sendable {
     /// the lock — three times the allocation, three times the time spent blocking `record` from
     /// the frame path, and three chances for the figures to describe different windows.
     public struct Summary: Sendable, Equatable {
+        /// Preparation plus geometry building. **Not a frame time**: it excludes rasterisation on
+        /// every backend that cannot observe its own drawing.
         public let cpu: FrameStatistics?
+        /// The backend's own drawing, where it could time it. `nil` for a retained-mode backend,
+        /// whose tessellation and compositing happen in another process.
+        public let raster: FrameStatistics?
         public let gpu: FrameStatistics?
         /// `nil` when no retained frame reported a presentation time — unknowable, not zero.
         public let missedDeadlineRatio: Double?
@@ -97,6 +102,7 @@ public final class MetricsSink: Sendable {
     ///   vectors rather than a copy of the records themselves.
     public func summary(frameBudgetSeconds: Double) -> Summary {
         var cpuValues: [UInt64] = []
+        var rasterValues: [UInt64] = []
         var gpuValues: [UInt64] = []
         var missed = 0
         var judged = 0
@@ -105,7 +111,8 @@ public final class MetricsSink: Sendable {
             cpuValues.reserveCapacity(state.count)
             for offset in 0..<state.count {
                 let metrics = state.frames[self.index(of: offset, in: state)]
-                cpuValues.append(metrics.cpuTotalNs)
+                cpuValues.append(metrics.cpuPrepareAndEncodeNs)
+                if let raster = metrics.rasterNs { rasterValues.append(raster) }
                 if let gpu = metrics.gpuNs { gpuValues.append(gpu) }
                 if let late = metrics.missedDeadline(frameBudgetSeconds: frameBudgetSeconds) {
                     judged += 1
@@ -116,14 +123,22 @@ public final class MetricsSink: Sendable {
 
         return Summary(
             cpu: statistics(of: cpuValues),
+            raster: statistics(of: rasterValues),
             gpu: statistics(of: gpuValues),
             missedDeadlineRatio: judged > 0 ? Double(missed) / Double(judged) : nil
         )
     }
 
-    /// Percentiles of total CPU frame time.
+    /// Percentiles of preparation plus geometry building.
+    ///
+    /// Not a frame time. See ``Summary/cpu``.
     public func cpuStatistics() -> FrameStatistics? {
         summary(frameBudgetSeconds: .infinity).cpu
+    }
+
+    /// Percentiles of the backend's own drawing, over the frames that reported it.
+    public func rasterStatistics() -> FrameStatistics? {
+        summary(frameBudgetSeconds: .infinity).raster
     }
 
     /// Percentiles of GPU frame time, over the frames that reported one.

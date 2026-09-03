@@ -113,8 +113,7 @@ private struct ChartPane: View {
     let scene: ChartScene
 
     var body: some View {
-        CanvasChartView(frame: scene.frame)
-            .background(Color(.secondarySystemGroupedBackground))
+        CanvasChartView(frame: scene.frame, recorder: scene.rasterTime)
             .overlay(alignment: .topTrailing) { HUDView(scene: scene).padding(8) }
             .onGeometryChange(for: CGSize.self) { $0.size } action: { scene.chartSize = $0 }
             .frame(maxWidth: .infinity, maxHeight: .infinity)

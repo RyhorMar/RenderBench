@@ -219,7 +219,17 @@ public struct BenchmarkCase: Codable, Sendable, Equatable {
     public var measuredFrames: Int
     /// Which repeat of this configuration, counting from one. Repeats restart the application.
     public var repeatIndex: Int
+    /// Preparation plus geometry building. **Not the frame's cost**: a backend that cannot
+    /// observe its own drawing reports none of it here, so this column is comparable between
+    /// backends only as a sub-total.
     public var cpu: FrameStatistics
+    /// The backend's own rasterisation, where it could time it.
+    ///
+    /// `nil` for a retained-mode backend, whose tessellation and compositing happen in the render
+    /// server in another process — unobservable from here, and therefore absent rather than zero.
+    /// Without this column, and without `missedDeadlineRatio`, a row says nothing about whether a
+    /// method holds a frame budget.
+    public var raster: FrameStatistics?
     /// `nil` on a CPU-only backend, which has no GPU interval to report. Never zero.
     public var gpu: FrameStatistics?
     /// `nil` when nothing in the run could observe presentation.
@@ -240,6 +250,7 @@ public struct BenchmarkCase: Codable, Sendable, Equatable {
         measuredFrames: Int,
         repeatIndex: Int,
         cpu: FrameStatistics,
+        raster: FrameStatistics? = nil,
         gpu: FrameStatistics? = nil,
         missedDeadlineRatio: Double? = nil,
         pointsSubmitted: Int,
@@ -257,6 +268,7 @@ public struct BenchmarkCase: Codable, Sendable, Equatable {
         self.measuredFrames = measuredFrames
         self.repeatIndex = repeatIndex
         self.cpu = cpu
+        self.raster = raster
         self.gpu = gpu
         self.missedDeadlineRatio = missedDeadlineRatio
         self.pointsSubmitted = pointsSubmitted
