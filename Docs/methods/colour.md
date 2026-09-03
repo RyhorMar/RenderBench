@@ -86,6 +86,19 @@ Crossref, which records the online date as 2004; the journal issue is dated Febr
 
 ## Verified by
 
-Nothing yet, beyond the type compiling and the conversion being exercised by the renderer. This is
-the least-tested method in the package, and the only one whose central claim — separability under
-colour vision deficiency — has no test at all.
+`PaletteTests` in `BenchCoreTests`: the encoded-to-linear conversion matches the standard at black,
+white and mid-grey — 50 % encoded sRGB is 21.6 % linear light, and getting that wrong is what makes
+a naive gradient darken through the middle; the transfer function is continuous across its
+piecewise join and monotonic over all 256 levels; the channels are independent; each variant holds
+eight distinct colours; no pair has collapsed towards another in linear space; the two variants
+differ at every index; indices wrap rather than trap, including negative ones, which Swift's
+signed `%` would otherwise send out of bounds.
+
+Mutation-checked: replacing the palette with a single colour, dropping the transfer function,
+substituting a plain 2.2 gamma for the piecewise curve, using `abs()` instead of a floored modulo,
+and collapsing the three channels onto one each fail at least two tests.
+
+**The central claim still has no test.** Separability under colour vision deficiency needs
+Machado's simulation and CIEDE2000, neither of which is implemented — so "CVD-safe" remains
+inherited from the sources above rather than measured here, and the tests below it prove the
+mechanics, not the perception.
