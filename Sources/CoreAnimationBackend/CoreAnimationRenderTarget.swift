@@ -26,33 +26,9 @@ public enum CoreAnimationRenderTarget {
 
     /// Draws an already-populated layer tree.
     public static func render(_ layer: CALayer) -> [UInt8]? {
-        let bytesPerRow = width * bytesPerPixel
-        var pixels = [UInt8](repeating: 0, count: bytesPerRow * height)
-
-        let created: CGContext? = pixels.withUnsafeMutableBytes { raw in
-            CGContext(
-                data: raw.baseAddress,
-                width: width,
-                height: height,
-                bitsPerComponent: 8,
-                bytesPerRow: bytesPerRow,
-                space: CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB(),
-                bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue
-                    | CGBitmapInfo.byteOrder32Little.rawValue
-            )
-        }
-        guard let context = created else { return nil }
-
-        context.setAllowsAntialiasing(true)
-        context.setShouldAntialias(true)
-        context.interpolationQuality = .none
-        // `CALayer.render(in:)` draws in the layer's own coordinate space, whose origin is at the
-        // top left; the bitmap's is at the bottom left. Flipping here rather than in the geometry
-        // keeps both backends drawing from one set of coordinates.
-        context.translateBy(x: 0, y: CGFloat(height))
-        context.scaleBy(x: 1, y: -1)
-
-        layer.render(in: context)
-        return pixels
+        guard let canvas = BitmapCanvas(width: width, height: height) else { return nil }
+        canvas.context.interpolationQuality = .none
+        layer.render(in: canvas.context)
+        return canvas.pixels()
     }
 }

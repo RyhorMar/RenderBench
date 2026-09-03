@@ -37,31 +37,9 @@ public enum OffscreenRenderTarget {
         _ frame: CanvasFrame,
         background: PaletteColor = PaletteColor(red: 1, green: 1, blue: 1)
     ) -> [UInt8]? {
-        let bytesPerRow = width * bytesPerPixel
-        var pixels = [UInt8](repeating: 0, count: bytesPerRow * height)
-
-        let created: CGContext? = pixels.withUnsafeMutableBytes { raw in
-            CGContext(
-                data: raw.baseAddress,
-                width: width,
-                height: height,
-                bitsPerComponent: 8,
-                bytesPerRow: bytesPerRow,
-                space: CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB(),
-                bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue
-                    | CGBitmapInfo.byteOrder32Little.rawValue
-            )
-        }
-        guard let context = created else { return nil }
-
-        context.setAllowsAntialiasing(true)
-        context.setShouldAntialias(true)
+        guard let canvas = BitmapCanvas(width: width, height: height) else { return nil }
+        let context = canvas.context
         context.interpolationQuality = .none
-        // Core Graphics puts the origin at the bottom left; the frame's geometry is in the
-        // top-left space every view layer uses. Flipping here rather than in the geometry keeps
-        // the on-screen and off-screen paths drawing from one set of coordinates.
-        context.translateBy(x: 0, y: CGFloat(height))
-        context.scaleBy(x: 1, y: -1)
 
         context.setFillColor(components(background))
         context.fill(CGRect(x: 0, y: 0, width: CGFloat(width), height: CGFloat(height)))
@@ -97,7 +75,7 @@ public enum OffscreenRenderTarget {
         // Labels are deliberately not drawn. Text rasterisation depends on the installed font and
         // on the text engine's version, so including it would make a stored reference invalid on a
         // machine that draws the same chart correctly. Equivalence is about the data path.
-        return pixels
+        return canvas.pixels()
     }
 
     /// Prepares and renders in one step, at this target's fixed size.
@@ -129,39 +107,33 @@ public enum OffscreenRenderTarget {
         let bytesPerRow = width * bytesPerPixel
         guard pixels.count == bytesPerRow * height else { return false }
 
-        var copy = pixels
-        let image: CGImage? = copy.withUnsafeMutableBytes { raw -> CGImage? in
-            guard let provider = CGDataProvider(
-                dataInfo: nil,
-                data: raw.baseAddress!,
-                size: raw.count,
-                releaseData: { _, _, _ in }
-            ) else { return nil }
-            return CGImage(
-                width: width,
-                height: height,
-                bitsPerComponent: 8,
-                bitsPerPixel: 32,
-                bytesPerRow: bytesPerRow,
-                space: CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB(),
-                bitmapInfo: CGBitmapInfo(
-                    rawValue: CGImageAlphaInfo.premultipliedFirst.rawValue
-                        | CGBitmapInfo.byteOrder32Little.rawValue
-                ),
-                provider: provider,
-                decode: nil,
-                shouldInterpolate: false,
-                intent: .defaultIntent
-            )
-        }
-        guard let image,
-              let destination = CGImageDestinationCreateWithURL(
-                  url as CFURL,
-                  UTType.png.identifier as CFString,
-                  1,
-                  nil
-              )
-        else { return false }
+        // `CGDataProvider(data:)` retains the CFData, so nothing here outlives its backing. The
+        // earlier version handed out a pointer borrowed from an array and a no-op release callback,
+        // which left the image reading memory nobody had promised to keep.
+        guard let provider = CGDataProvider(data: Data(pixels) as CFData) else { return false }
+        guard let image = CGImage(
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bitsPerPixel: 32,
+            bytesPerRow: bytesPerRow,
+            space: PaletteColor.sRGB,
+            bitmapInfo: CGBitmapInfo(
+                rawValue: CGImageAlphaInfo.premultipliedFirst.rawValue
+                    | CGBitmapInfo.byteOrder32Little.rawValue
+            ),
+            provider: provider,
+            decode: nil,
+            shouldInterpolate: false,
+            intent: .defaultIntent
+        ) else { return false }
+
+        guard let destination = CGImageDestinationCreateWithURL(
+            url as CFURL,
+            UTType.png.identifier as CFString,
+            1,
+            nil
+        ) else { return false }
 
         CGImageDestinationAddImage(destination, image, nil)
         return CGImageDestinationFinalize(destination)
