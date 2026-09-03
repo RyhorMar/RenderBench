@@ -64,7 +64,9 @@ public enum OffscreenRenderTarget {
 
             context.setLineWidth(CGFloat(frame.lineWidth))
             context.setLineCap(.round)
-            context.setLineJoin(.round)
+            // Bevel: matches both backends' on-screen stroke style, so the reference is a
+            // reference for what actually ships.
+            context.setLineJoin(.bevel)
             for stroke in frame.strokes {
                 context.setStrokeColor(components(stroke.colour))
                 context.addPath(stroke.path.cgPath)

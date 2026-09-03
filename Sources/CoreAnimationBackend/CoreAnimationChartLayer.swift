@@ -11,6 +11,13 @@ public struct CoreAnimationFrame: Sendable {
     public var pointsDrawn: Int
     /// Shape layers carrying a series path. The Core Animation analogue of a draw call.
     public var shapeLayerCount: Int
+    /// Animatable properties actually written this frame, excluding the paths.
+    ///
+    /// Reported rather than assumed: every such write marks a shape dirty and triggers an action
+    /// lookup, and an earlier version rewrote colour, width and the hidden flag on every series
+    /// every frame — about three thousand a second at 120 Hz — while its own documentation claimed
+    /// only the path was replaced. A steady scene should settle at zero.
+    public var styleWrites: Int
     /// Nanoseconds spent windowing, reducing and projecting — the shared preparation.
     public var prepareNs: UInt64
     /// Nanoseconds spent building paths and assigning them to layers.
@@ -22,6 +29,7 @@ public struct CoreAnimationFrame: Sendable {
         pointsSubmitted = 0
         pointsDrawn = 0
         shapeLayerCount = 0
+        styleWrites = 0
         prepareNs = 0
         encodeNs = 0
         failures = []
@@ -43,18 +51,44 @@ public final class CoreAnimationChartLayer: CALayer {
     private let gridLayer = CAShapeLayer()
     private let axisLayer = CAShapeLayer()
     private var seriesLayers: [CAShapeLayer] = []
+    /// Last colour and width written to each series layer, so an unchanged appearance is not
+    /// rewritten. Every animatable write marks the shape dirty and triggers an action lookup, and
+    /// a freshly built `CGColor` is never equal by identity to the last one — so without this the
+    /// short-circuit that would skip the work can never fire.
+    private var appliedStyle: [ObjectIdentifier: (colour: PaletteColor, width: Double)] = [:]
 
     /// Background fill, matching the offscreen reference so the two backends can be compared.
-    public var backgroundFill = PaletteColor(red: 1, green: 1, blue: 1)
+    public var backgroundFill = PaletteColor(red: 1, green: 1, blue: 1) {
+        didSet { backgroundColor = backgroundFill.cgColor }
+    }
+
+    /// Device pixels per point. **Must be set by the host** from the screen it draws on.
+    ///
+    /// A hand-allocated `CALayer` starts at 1.0 and `addSublayer` does not propagate the value, so
+    /// left alone every shape here rasterises at a third of a 3x device's resolution: soft strokes,
+    /// and — worse for this project — roughly a ninth of the render server's work, which would let
+    /// this backend win a timing comparison it never actually ran.
+    public var renderScale: CGFloat = 1 {
+        didSet { applyScale() }
+    }
 
     public override init() {
         super.init()
         commonSetup()
     }
 
+    /// Core Animation's initialiser for a presentation copy.
+    ///
+    /// Documented to be used **only** to copy custom property values from `layer`. An earlier
+    /// version ran the full setup here, which allocated two shape layers and attached them to
+    /// every presentation copy the render server took, while leaving the copy's series layers
+    /// empty and resetting its background to white.
     public override init(layer: Any) {
         super.init(layer: layer)
-        commonSetup()
+        if let source = layer as? CoreAnimationChartLayer {
+            backgroundFill = source.backgroundFill
+            renderScale = source.renderScale
+        }
     }
 
     public required init?(coder: NSCoder) {
@@ -63,17 +97,51 @@ public final class CoreAnimationChartLayer: CALayer {
     }
 
     private func commonSetup() {
-        // Every layer here is drawn by an explicit path assignment, never by `draw(in:)`, so
-        // there is nothing for the layer to redraw on its own.
-        needsDisplayOnBoundsChange = false
+        backgroundColor = backgroundFill.cgColor
         gridLayer.fillColor = nil
         gridLayer.lineWidth = 0.5
-        gridLayer.strokeColor = cgColour(PaletteColor(red: 0.8, green: 0.8, blue: 0.8))
+        gridLayer.strokeColor = PaletteColor(red: 0.8, green: 0.8, blue: 0.8).cgColor
         axisLayer.fillColor = nil
         axisLayer.lineWidth = 1
-        axisLayer.strokeColor = cgColour(PaletteColor(red: 0.4, green: 0.4, blue: 0.4))
-        addSublayer(gridLayer)
-        addSublayer(axisLayer)
+        axisLayer.strokeColor = PaletteColor(red: 0.4, green: 0.4, blue: 0.4).cgColor
+        for layer in [gridLayer, axisLayer] {
+            suppressActions(on: layer)
+            addSublayer(layer)
+        }
+        suppressActions(on: self)
+        applyScale()
+    }
+
+    /// Turns off implicit animation as a property of the layer, not of one call site.
+    ///
+    /// The transaction inside ``update(with:)`` protects only what happens there. A resize, a
+    /// layout pass, or any host code touching a stroke colour outside it would otherwise get the
+    /// default quarter-second animation back — a chart that visibly slides into place on rotation.
+    private func suppressActions(on layer: CALayer) {
+        layer.actions = [
+            "path": NSNull(), "bounds": NSNull(), "position": NSNull(), "frame": NSNull(),
+            "strokeColor": NSNull(), "lineWidth": NSNull(), "hidden": NSNull(),
+            "backgroundColor": NSNull(), "contents": NSNull(), "sublayers": NSNull(),
+        ]
+    }
+
+    private func applyScale() {
+        contentsScale = renderScale
+        for layer in sublayers ?? [] { layer.contentsScale = renderScale }
+    }
+
+    /// Keeps every sublayer covering the whole chart.
+    ///
+    /// Without this each sublayer keeps `bounds == .zero`, and the paths draw only because a shape
+    /// layer does not clip to its bounds and `masksToBounds` defaults to false — correct by the
+    /// coincidence of two defaults. The render server sizes backing stores and computes dirty
+    /// rects from that geometry, so it would be reasoning about ten zero-area boxes at the origin.
+    public override func layoutSublayers() {
+        super.layoutSublayers()
+        for layer in sublayers ?? [] {
+            layer.frame = bounds
+            layer.contentsScale = renderScale
+        }
     }
 
     /// Puts a prepared frame into the tree.
@@ -91,17 +159,17 @@ public final class CoreAnimationChartLayer: CALayer {
 
         let clock = ContinuousClock()
         var drawn = 0
+        var styleWrites = 0
 
         let elapsed = clock.measure {
-            // Implicit animations are the default for every animatable layer property, so without
-            // this each new path would cross-fade into the last over a quarter of a second. On a
-            // chart that is both wrong — the reader sees a blend of two instants — and expensive,
-            // since the layer keeps both geometries alive for the duration.
+            // Belt to the per-layer `actions` braces. `CAShapeLayer.path` is animatable but
+            // creates no implicit animation of its own — the earlier comment here claimed
+            // otherwise — so what this actually protects is the stroke colour, the line width and
+            // the hidden flag, each of which would cross-fade over a quarter of a second and let
+            // the reader see a blend of two instants.
             CATransaction.begin()
             CATransaction.setDisableActions(true)
             defer { CATransaction.commit() }
-
-            backgroundColor = cgColour(backgroundFill)
 
             let grid = CGMutablePath()
             for tick in prepared.yTicks {
@@ -120,9 +188,23 @@ public final class CoreAnimationChartLayer: CALayer {
             growSeriesLayers(to: prepared.series.count)
             for (position, series) in prepared.series.enumerated() {
                 let layer = seriesLayers[position]
-                layer.strokeColor = cgColour(series.colour)
-                layer.lineWidth = CGFloat(prepared.lineWidth)
-                layer.isHidden = false
+                // Only on change. Rewriting an identical colour and width every frame was around
+                // a thousand CGColor allocations and three thousand animatable writes a second at
+                // 120 Hz with eight series — all charged to a backend whose number is meant to
+                // stand for the rendering method.
+                let key = ObjectIdentifier(layer)
+                let wanted = (colour: series.colour, width: prepared.lineWidth)
+                if appliedStyle[key]?.colour != wanted.colour
+                    || appliedStyle[key]?.width != wanted.width {
+                    layer.strokeColor = series.colour.cgColor
+                    layer.lineWidth = CGFloat(prepared.lineWidth)
+                    appliedStyle[key] = wanted
+                    styleWrites += 2
+                }
+                if layer.isHidden {
+                    layer.isHidden = false
+                    styleWrites += 1
+                }
 
                 let path = CGMutablePath()
                 var penIsDown = false
@@ -145,14 +227,17 @@ public final class CoreAnimationChartLayer: CALayer {
                 }
                 layer.path = path
             }
-            for position in prepared.series.count..<seriesLayers.count {
+            for position in prepared.series.count..<seriesLayers.count
+            where !seriesLayers[position].isHidden {
                 seriesLayers[position].isHidden = true
                 seriesLayers[position].path = nil
+                styleWrites += 1
             }
         }
 
         result.pointsDrawn = drawn
         result.shapeLayerCount = prepared.series.count
+        result.styleWrites = styleWrites
         result.encodeNs = elapsed.nanoseconds
         return result
     }
@@ -167,15 +252,16 @@ public final class CoreAnimationChartLayer: CALayer {
             let layer = CAShapeLayer()
             layer.fillColor = nil
             layer.lineCap = .round
-            layer.lineJoin = .round
+            // Bevel, not round. At roughly one point between vertices a round join builds arc
+            // geometry nobody can see; the Canvas backend makes the same choice, so the two are
+            // comparable rather than differing by stroke style.
+            layer.lineJoin = .bevel
+            layer.frame = bounds
+            layer.contentsScale = renderScale
+            suppressActions(on: layer)
             addSublayer(layer)
             seriesLayers.append(layer)
         }
     }
 
-    /// Colours come from the one shared helper, which names sRGB explicitly rather than falling
-    /// into Generic RGB — see ``PaletteColor/cgColor``.
-    private func cgColour(_ colour: PaletteColor) -> CGColor {
-        colour.cgColor
-    }
 }

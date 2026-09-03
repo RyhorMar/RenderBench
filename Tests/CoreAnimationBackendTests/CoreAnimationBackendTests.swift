@@ -262,3 +262,125 @@ func aRefusedSeriesIsCarriedThroughRatherThanDropped() {
 func identifierIsPinned() {
     #expect(CoreAnimationBackend.identifier == "core-animation")
 }
+
+/// A hand-allocated CALayer starts at scale 1 and `addSublayer` does not propagate the value, so
+/// without explicit propagation every shape rasterises at a third of a 3x device's resolution —
+/// and the render server does about a ninth of the work, which would hand this backend a timing
+/// win it never earned.
+@Test
+func theRenderScaleReachesEverySublayer() {
+    let layer = CoreAnimationChartLayer()
+    layer.frame = CGRect(x: 0, y: 0, width: size.width, height: size.height)
+    layer.renderScale = 3
+    layer.update(with: prepared(seriesCount: 4))
+
+    #expect(layer.contentsScale == 3)
+    for sublayer in layer.sublayers ?? [] {
+        #expect(sublayer.contentsScale == 3, "a sublayer is still at \(sublayer.contentsScale)")
+    }
+
+    // And a layer created after the scale was set inherits it rather than starting at 1.
+    layer.update(with: prepared(seriesCount: 8))
+    for sublayer in layer.sublayers ?? [] {
+        #expect(sublayer.contentsScale == 3)
+    }
+}
+
+/// Every sublayer covers the chart. Left at the default they sit at CGRect.zero and draw only
+/// because a shape layer does not clip to its bounds — correct by coincidence, and undone the
+/// moment anyone sets `masksToBounds` on the root.
+@Test
+func everySublayerCoversTheChart() {
+    let layer = CoreAnimationChartLayer()
+    layer.frame = CGRect(x: 0, y: 0, width: size.width, height: size.height)
+    layer.update(with: prepared())
+    layer.layoutIfNeeded()
+
+    for sublayer in layer.sublayers ?? [] {
+        #expect(sublayer.frame == layer.bounds, "a sublayer is at \(sublayer.frame)")
+    }
+}
+
+/// `init(layer:)` is Core Animation's presentation-copy initialiser, documented for copying custom
+/// properties and nothing else. Running the full setup there attached fresh sublayers to every
+/// copy the render server took.
+@Test
+func aPresentationCopyCarriesPropertiesAndNoSublayers() {
+    let original = CoreAnimationChartLayer()
+    original.backgroundFill = PaletteColor(srgb: 0x10, 0x20, 0x30)
+    original.renderScale = 2
+    original.update(with: prepared(seriesCount: 3))
+
+    let copy = CoreAnimationChartLayer(layer: original)
+    #expect(copy.backgroundFill == original.backgroundFill)
+    #expect(copy.renderScale == 2)
+    #expect((copy.sublayers ?? []).isEmpty, "the copy allocated \((copy.sublayers ?? []).count) sublayers")
+}
+
+/// Implicit animation is suppressed as a property of each layer, not only inside the update's
+/// transaction — otherwise a resize or any host code touching a stroke colour brings the default
+/// quarter-second cross-fade back, and the chart slides into place on every rotation.
+@Test
+func actionsAreSuppressedOnEveryLayerNotJustInsideTheTransaction() {
+    let layer = CoreAnimationChartLayer()
+    layer.frame = CGRect(x: 0, y: 0, width: size.width, height: size.height)
+    layer.update(with: prepared(seriesCount: 2))
+
+    for candidate in [layer] + (layer.sublayers ?? []) {
+        for key in ["path", "bounds", "position", "strokeColor", "lineWidth", "hidden"] {
+            #expect(candidate.actions?[key] is NSNull, "\(key) is not suppressed on \(type(of: candidate))")
+        }
+    }
+}
+
+/// The background is a property of the layer, not of a drawable frame. Setting it only inside the
+/// update left a fresh layer, and any degenerate frame, transparent while the Canvas reference
+/// filled white — a total mismatch attributable to nothing about rendering.
+@Test
+func theBackgroundIsSetBeforeAnyFrameArrives() {
+    let layer = CoreAnimationChartLayer()
+    #expect(layer.backgroundColor != nil)
+
+    layer.backgroundFill = PaletteColor(srgb: 0, 0, 0)
+    #expect(layer.backgroundColor?.components?.first == 0)
+
+    // A frame too small to draw must not clear it.
+    var scratch: [Sample] = []
+    let tiny = FramePreparation.prepare(
+        provider: eightCurves(),
+        spec: LineChartSpec(series: [0]),
+        window: window,
+        yDomain: yDomain,
+        size: (width: 10, height: 10),
+        dark: false,
+        measuring: ApproximateTextWidth(),
+        scratch: &scratch
+    )
+    layer.update(with: tiny)
+    #expect(layer.backgroundColor != nil)
+}
+
+/// An unchanged appearance is not rewritten. Every animatable write marks the shape dirty and
+/// triggers an action lookup, and a freshly built CGColor is never equal by identity to the last,
+/// so without the cache the short-circuit that would skip the work can never fire.
+///
+/// Counted, not compared. An earlier version of this test compared `strokeColor` by identity and
+/// passed with the cache deliberately disabled — Core Graphics is free to return an equivalent
+/// object, so identity measures nothing here. The layer reports what it actually wrote.
+@Test
+func anUnchangedStrokeStyleIsNotRewritten() {
+    let layer = CoreAnimationChartLayer()
+    layer.frame = CGRect(x: 0, y: 0, width: size.width, height: size.height)
+
+    // First frame: colour and width for each of three series, and each one un-hidden.
+    let first = layer.update(with: prepared(seriesCount: 3))
+    #expect(first.styleWrites > 0)
+
+    // Second frame, same configuration: nothing about the appearance changed.
+    let second = layer.update(with: prepared(seriesCount: 3))
+    #expect(second.styleWrites == 0, "\(second.styleWrites) style writes on an unchanged frame")
+
+    // Shrinking hides the surplus, which is a write; shrinking again is not.
+    #expect(layer.update(with: prepared(seriesCount: 1)).styleWrites == 2)
+    #expect(layer.update(with: prepared(seriesCount: 1)).styleWrites == 0)
+}

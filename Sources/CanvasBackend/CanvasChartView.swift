@@ -43,16 +43,14 @@ public struct CanvasChartView: View {
             axes.addLine(to: CGPoint(x: plot.maxX, y: plot.maxY))
             context.stroke(axes, with: .color(axisColour), lineWidth: 1)
 
+            // One style for every series: only the colour varies, and rebuilding the value inside
+            // the loop allocated per series per frame. Bevel rather than round joins — at roughly
+            // one point between vertices a round join builds arc geometry nobody can see, about
+            // eight thousand of them a frame, and a Metal backend emitting plain quads would be
+            // compared against that cost as if it were a difference in method.
+            let style = StrokeStyle(lineWidth: frame.lineWidth, lineCap: .round, lineJoin: .bevel)
             for stroke in frame.strokes {
-                context.stroke(
-                    stroke.path,
-                    with: .color(colour(stroke.colour)),
-                    style: StrokeStyle(
-                        lineWidth: frame.lineWidth,
-                        lineCap: .round,
-                        lineJoin: .round
-                    )
-                )
+                context.stroke(stroke.path, with: .color(colour(stroke.colour)), style: style)
             }
 
             for tick in frame.yTicks {
