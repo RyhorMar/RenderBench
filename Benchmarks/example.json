@@ -1,0 +1,69 @@
+{
+  "cases" : [
+    {
+      "backend" : "canvas",
+      "chartKind" : "strip-chart",
+      "cpu" : {
+        "maxNs" : 9800000,
+        "p50Ns" : 1400000,
+        "p95Ns" : 3100000,
+        "p99Ns" : 3400000,
+        "sampleCount" : 1200
+      },
+      "drawCalls" : 8,
+      "equivalence" : "notChecked",
+      "measuredFrames" : 1200,
+      "missedDeadlineRatio" : 0,
+      "pointsDrawn" : 2512,
+      "pointsPerSeries" : 10000,
+      "pointsSubmitted" : 2512,
+      "policy" : "minMax",
+      "refreshHz" : 120,
+      "repeatIndex" : 1,
+      "seriesCount" : 8,
+      "warmupFrames" : 120
+    },
+    {
+      "backend" : "canvas",
+      "chartKind" : "strip-chart",
+      "cpu" : {
+        "maxNs" : 41000000,
+        "p50Ns" : 6900000,
+        "p95Ns" : 15800000,
+        "p99Ns" : 16400000,
+        "sampleCount" : 1200
+      },
+      "drawCalls" : 8,
+      "equivalence" : "notChecked",
+      "measuredFrames" : 1200,
+      "missedDeadlineRatio" : 0.31,
+      "pointsDrawn" : 2512,
+      "pointsPerSeries" : 100000,
+      "pointsSubmitted" : 2512,
+      "policy" : "lttb",
+      "refreshHz" : 120,
+      "repeatIndex" : 1,
+      "seriesCount" : 8,
+      "warmupFrames" : 120
+    }
+  ],
+  "env" : {
+    "batteryLevel" : 0.87,
+    "deviceModel" : "iPhone00,0",
+    "isSimulator" : false,
+    "lowPowerModeEnabled" : false,
+    "maximumFramesPerSecond" : 120,
+    "osVersion" : "26.0",
+    "thermalStateAtEnd" : "fair",
+    "thermalStateAtStart" : "nominal"
+  },
+  "run" : {
+    "configuration" : "release",
+    "gitDirty" : false,
+    "gitSha" : "0000000000000000000000000000000000000000",
+    "id" : "example",
+    "startedAt" : "2025-09-03T11:46:40Z",
+    "swiftVersion" : "6.3.3",
+    "xcodeVersion" : "26.6"
+  }
+}

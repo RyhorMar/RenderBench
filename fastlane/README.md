@@ -15,6 +15,22 @@ For _fastlane_ installation instructions, see [Installing _fastlane_](https://do
 
 ## iOS
 
+### ios stamp
+
+```sh
+[bundle exec] fastlane ios stamp
+```
+
+Stamp the build with the revision it came from
+
+### ios bench_guard
+
+```sh
+[bundle exec] fastlane ios bench_guard
+```
+
+Validate the benchmark schema, the example and every stored result
+
 ### ios generate
 
 ```sh

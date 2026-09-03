@@ -1,0 +1,144 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "RenderBench benchmark run",
+  "description": "One measured run. The format is deliberately verbose about conditions and terse about numbers: a percentile takes one line, establishing that the percentile means anything takes a dozen. Required fields are required because a result missing any of them cannot be reproduced or compared, and a bench-guard job rejects such a file rather than storing it.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["run", "env", "cases"],
+  "properties": {
+    "run": {
+      "type": "object",
+      "description": "What code produced these numbers, and when.",
+      "additionalProperties": false,
+      "required": ["id", "startedAt", "gitSha", "gitDirty", "configuration", "swiftVersion"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Unique run id. The literal \"example\" marks the documented shape illustration; a file carrying it is refused under results/."
+        },
+        "startedAt": { "type": "string", "format": "date-time" },
+        "gitSha": {
+          "type": "string",
+          "minLength": 1,
+          "not": { "const": "unknown" },
+          "description": "Commit the measured binary was built from. A number that cannot be traced to a revision is not evidence of anything, so \"unknown\" is rejected as firmly as an absent field."
+        },
+        "gitDirty": {
+          "type": "boolean",
+          "description": "Whether the working tree had uncommitted changes. A dirty run is recorded, not refused — but the reader gets to know."
+        },
+        "configuration": { "enum": ["debug", "release"] },
+        "swiftVersion": { "type": "string", "minLength": 1 },
+        "xcodeVersion": { "type": "string" }
+      }
+    },
+    "env": {
+      "type": "object",
+      "description": "The machine, the OS and the conditions.",
+      "additionalProperties": false,
+      "required": [
+        "deviceModel",
+        "osVersion",
+        "isSimulator",
+        "maximumFramesPerSecond",
+        "thermalStateAtStart",
+        "thermalStateAtEnd",
+        "lowPowerModeEnabled"
+      ],
+      "properties": {
+        "deviceModel": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Hardware identifier as the kernel reports it, e.g. iPhone17,1. A marketing name is ambiguous across regions and storage tiers."
+        },
+        "osVersion": { "type": "string", "minLength": 1 },
+        "isSimulator": {
+          "type": "boolean",
+          "description": "A simulator run is refused at publication: Metal is translated, there is no thermal envelope, and the display is not the device's."
+        },
+        "maximumFramesPerSecond": { "type": "integer", "minimum": 1 },
+        "thermalStateAtStart": { "enum": ["nominal", "fair", "serious", "critical"] },
+        "thermalStateAtEnd": {
+          "enum": ["nominal", "fair", "serious", "critical"],
+          "description": "Required at both ends. A run that begins nominal and ends serious measured two different machines, and only the pair says so."
+        },
+        "lowPowerModeEnabled": { "type": "boolean" },
+        "batteryLevel": { "type": "number", "minimum": 0, "maximum": 1 }
+      }
+    },
+    "cases": {
+      "type": "array",
+      "minItems": 1,
+      "description": "One entry per measured configuration. An empty array is a run that measured nothing.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "chartKind",
+          "backend",
+          "seriesCount",
+          "pointsPerSeries",
+          "refreshHz",
+          "policy",
+          "warmupFrames",
+          "measuredFrames",
+          "repeatIndex",
+          "cpu",
+          "pointsSubmitted",
+          "pointsDrawn",
+          "drawCalls",
+          "equivalence"
+        ],
+        "properties": {
+          "chartKind": { "type": "string", "minLength": 1 },
+          "backend": { "type": "string", "minLength": 1 },
+          "seriesCount": { "type": "integer", "minimum": 1 },
+          "pointsPerSeries": { "type": "integer", "minimum": 1 },
+          "refreshHz": { "type": "integer", "minimum": 1 },
+          "policy": { "enum": ["minMax", "lttb", "none"] },
+          "warmupFrames": { "type": "integer", "minimum": 0 },
+          "measuredFrames": { "type": "integer", "minimum": 1 },
+          "repeatIndex": { "type": "integer", "minimum": 1 },
+          "cpu": { "$ref": "#/$defs/percentiles" },
+          "gpu": {
+            "$ref": "#/$defs/percentiles",
+            "description": "Absent on a CPU-only backend, which has no GPU interval to report. Never zero: a zero would win every comparison it appeared in."
+          },
+          "missedDeadlineRatio": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Absent when nothing in the run could observe presentation. Unknowable is not the same as none."
+          },
+          "pointsSubmitted": { "type": "integer", "minimum": 0 },
+          "pointsDrawn": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Divergence from pointsSubmitted means the backend bought its frame time by dropping work."
+          },
+          "drawCalls": { "type": "integer", "minimum": 0 },
+          "equivalence": {
+            "enum": ["passed", "failed", "notChecked"],
+            "description": "Whether the backend was shown to draw the same picture as the reference before its timings were compared. \"notChecked\" is its own value so that it can never be read as \"passed\"; a \"failed\" case makes the whole file unpublishable."
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "percentiles": {
+      "type": "object",
+      "description": "Nearest-rank percentiles in nanoseconds, over sampleCount frames. The definition is named rather than assumed: the nine definitions in common use disagree by a whole frame on a hundred-sample window.",
+      "additionalProperties": false,
+      "required": ["sampleCount", "p50Ns", "p95Ns", "p99Ns", "maxNs"],
+      "properties": {
+        "sampleCount": { "type": "integer", "minimum": 1 },
+        "p50Ns": { "type": "integer", "minimum": 0 },
+        "p95Ns": { "type": "integer", "minimum": 0 },
+        "p99Ns": { "type": "integer", "minimum": 0 },
+        "maxNs": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

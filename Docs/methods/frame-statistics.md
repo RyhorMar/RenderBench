@@ -13,6 +13,9 @@ of its own, so a HUD cannot contradict the results file it was meant to illustra
 | `FrameMetrics` | `BenchRuntime` |
 | `MetricsSink` | `BenchRuntime` |
 | `FrameStatistics` | `BenchRuntime` |
+| `BenchmarkResult` | `BenchRuntime` |
+| `RunEnvironment` | `BenchRuntime` |
+| `BenchmarkValidationError` | `BenchRuntime` |
 
 ## Contract
 
@@ -77,6 +80,22 @@ than half a frame budget, which is a threshold this project chose and can defend
   CPU-only path that is every frame, so the field is currently unknowable rather than good.
 - Nothing here computes a confidence interval. A p95 without one is not a basis for "A is faster
   than B", and this package does not yet publish such a comparison.
+
+## How a measurement is stored
+
+A percentile is one line; establishing that the percentile means anything takes a dozen, so the
+stored format is verbose about conditions and terse about numbers. `Benchmarks/schema.json` is the
+contract; [`Benchmarks/README.md`](../../Benchmarks/README.md) is the procedure.
+
+Required fields are required at the type level, not checked afterwards: decoding a result rejects an
+absent **or empty** `gitSha`, `deviceModel` or thermal state, so the two cases produce one error
+rather than two behaviours. A `gitSha` of `unknown` — what an unstamped build writes — is rejected
+as firmly as a missing one, because a number that cannot be traced to a revision is not evidence.
+
+Three conditions are checked separately from decoding, because a file can be well-formed and still
+unfit to publish: a simulator run, a file marked as the documented example sitting among measured
+results, and a case whose equivalence check failed. `notChecked` is its own value precisely so it
+can never be read as `passed`.
 
 ## Verified by
 

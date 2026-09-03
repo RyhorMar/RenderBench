@@ -1,7 +1,7 @@
 import Synchronization
 
 /// Percentiles over a window of frames.
-public struct FrameStatistics: Sendable, Equatable {
+public struct FrameStatistics: Sendable, Equatable, Codable {
     /// Frames the summary was computed over.
     public let sampleCount: Int
     /// Nanoseconds.

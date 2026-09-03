@@ -109,6 +109,15 @@ let package = Package(
             swiftSettings: strict
         ),
 
+        // The bench-guard. A results file in the repository has passed this, so a reader does not
+        // have to wonder whether the run behind a number was valid.
+        .executableTarget(
+            name: "CheckBenchmarkResults",
+            dependencies: ["BenchRuntime"],
+            path: "Scripts/CheckBenchmarkResults",
+            swiftSettings: strict
+        ),
+
         // The README quickstart is compiled, not quoted. A quickstart that no longer builds is
         // the fastest way to lose a reader permanently.
         .target(
