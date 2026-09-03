@@ -23,6 +23,11 @@ platform :ios do
     sh("swift", "run", "--package-path", "..", "CheckImports", File.expand_path("..", Dir.pwd))
   end
 
+  desc "Check that the method pages still describe symbols that exist"
+  lane :method_docs do
+    sh("swift", "run", "--package-path", "..", "CheckMethodDocs", File.expand_path("..", Dir.pwd))
+  end
+
   desc "Build the demo for a simulator"
   lane :demo do
     generate
@@ -52,6 +57,7 @@ platform :ios do
   lane :ci do
     package
     imports
+    method_docs
     demo
   end
 end

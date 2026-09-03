@@ -46,6 +46,7 @@ public struct SlotCounters: Sendable, Equatable {
 /// sort. Back-pressure slows the producer down. This does not; it tells you how often it didn't.
 ///
 /// A lossless record, when one is needed, is a second channel, not a deeper queue here.
+/// - SeeAlso: Docs/methods/frame-pipeline.md
 public final class FrameSlot: Sendable {
     /// The snapshot and the counters describing it, under one lock.
     ///

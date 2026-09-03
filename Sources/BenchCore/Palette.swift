@@ -31,6 +31,9 @@ public struct PaletteColor: Sendable, Hashable {
 /// need direct labels instead. The set is chosen to stay separable under the common forms of
 /// colour vision deficiency, which rules out the red/green pairing that most default palettes open
 /// with.
+///
+/// - SeeAlso: Docs/methods/colour.md — the sources this set follows, and why "CVD-safe" is
+///   currently a claim inherited from them rather than one measured here.
 public enum Palette {
     /// Eight categorical colours for a light background.
     public static let categoricalLight: [PaletteColor] = [

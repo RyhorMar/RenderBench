@@ -25,6 +25,8 @@ import BenchScales
 ///   is meaningless.
 /// - Precondition: `targetPoints >= 2`.
 /// - Complexity: O(*n*) for every policy, single pass.
+/// - SeeAlso: Docs/methods/downsampling.md — provenance, the alternatives, and what each policy
+///   gets wrong.
 public func downsample(
     _ slice: SeriesSlice,
     to targetPoints: Int,

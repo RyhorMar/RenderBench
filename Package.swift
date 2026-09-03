@@ -101,6 +101,14 @@ let package = Package(
             swiftSettings: strict
         ),
 
+        // Documentation drifts silently; this makes one class of drift loud. It cannot verify that
+        // a method page is *right*, only that it still describes symbols that exist.
+        .executableTarget(
+            name: "CheckMethodDocs",
+            path: "Scripts/CheckMethodDocs",
+            swiftSettings: strict
+        ),
+
         // The README quickstart is compiled, not quoted. A quickstart that no longer builds is
         // the fastest way to lose a reader permanently.
         .target(

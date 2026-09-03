@@ -10,6 +10,8 @@
 /// while the producer pushes sees a consistent older state rather than a torn one.
 ///
 /// - Invariant: `count <= capacity`, and `head` is always in `0..<capacity`.
+/// - SeeAlso: Docs/methods/buffers-and-windows.md — why the storage is mirrored, and what that
+///   costs.
 public struct RingBuffer<Element: Sendable>: Sendable {
     /// Most elements retained. Older ones are overwritten.
     public let capacity: Int

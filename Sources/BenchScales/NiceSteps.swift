@@ -5,6 +5,8 @@ import Foundation
 /// Axis labels are read, subtracted and interpolated by eye. A step of 3.7 defeats all three, so
 /// the spacing is snapped to `1`, `2`, `2.5` or `5` times a power of ten. The 2.5 is what makes
 /// quarters land on round numbers, which matters for fractions and percentages.
+///
+/// - SeeAlso: Docs/methods/axis-ticks.md
 public enum NiceSteps {
     /// The smallest allowed step that yields at most `targetCount` intervals across `span`.
     ///

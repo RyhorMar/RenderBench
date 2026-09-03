@@ -39,6 +39,14 @@ Build and test the package on the host — the fastest failure signal available
 
 Check the layering rule. Nothing else enforces it: SwiftPM does not restrict imports.
 
+### ios method_docs
+
+```sh
+[bundle exec] fastlane ios method_docs
+```
+
+Check that the method pages still describe symbols that exist
+
 ### ios demo
 
 ```sh

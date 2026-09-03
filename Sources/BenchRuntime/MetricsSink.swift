@@ -30,6 +30,9 @@ public struct FrameStatistics: Sendable, Equatable {
 /// observations fall, with no interpolation. Stated because the alternatives differ by a whole
 /// frame on a hundred-sample window, and a table that does not say which it used cannot be
 /// compared with anything.
+///
+/// - SeeAlso: Docs/methods/frame-statistics.md — why nearest-rank, and what a percentile over
+///   this window does not tell you.
 public final class MetricsSink: Sendable {
     private struct Storage {
         var frames: [FrameMetrics]

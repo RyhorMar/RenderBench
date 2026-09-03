@@ -5,6 +5,7 @@ import Foundation
 /// Box–Muller rather than a library call, for the same reason `SplitMix64` is written out here:
 /// the transform must be reproducible across platforms and launches, and it produces two values
 /// per pair of uniforms, so the second is kept rather than thrown away.
+/// - SeeAlso: Docs/methods/randomness-and-signals.md
 public struct GaussianNoise: Sendable {
     private var uniform: SplitMix64
     private var spare: Double?

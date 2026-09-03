@@ -4,6 +4,8 @@
 /// not, so this must not cost anything proportional to the buffer — and an off-by-one here shows
 /// up as a chart that is one sample wrong, which is exactly the kind of defect a second copy of
 /// the same search would let survive in whichever provider had no test.
+///
+/// - SeeAlso: Docs/methods/buffers-and-windows.md
 public enum CarrierSearch {
     /// Half-open index range of the carriers falling inside `window`, both ends inclusive.
     ///

@@ -6,6 +6,7 @@
 ///
 /// - Note: Steele, Lea and Flood, *Fast Splittable Pseudorandom Number Generators*, OOPSLA 2014,
 ///   §4 — the `nextLong` mixing function. The constants are the paper's.
+/// - SeeAlso: Docs/methods/randomness-and-signals.md
 public struct SplitMix64: RandomNumberGenerator, Sendable {
     private var state: UInt64
 

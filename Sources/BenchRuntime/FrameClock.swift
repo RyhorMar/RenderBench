@@ -40,6 +40,7 @@ public protocol DisplayTicking: AnyObject {
 /// a comparison between them stops meaning anything. That is the failure this type exists to make
 /// impossible, so advancing the clock is not part of its public surface — only the source can do
 /// it, and drawing code has no way to reach it.
+/// - SeeAlso: Docs/methods/frame-pipeline.md
 @MainActor
 public final class FrameClock {
     /// A registration. Hold it for as long as the observer should receive ticks, and pass it to
