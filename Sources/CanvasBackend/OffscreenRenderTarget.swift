@@ -33,33 +33,48 @@ public enum OffscreenRenderTarget {
     ///   - background: Fill drawn before the frame. White by default, so a stored reference is
     ///     legible on its own.
     /// - Returns: `width * height * 4` bytes, or `nil` when a context could not be created.
+    /// Renders a frame at a pinned configuration and returns raw premultiplied BGRA bytes.
+    ///
+    /// - Parameter scale: Device pixels per point. The reference is produced at 1 by default and
+    ///   the screen draws at 2 or 3, so a statement relating this image to a device's rendering
+    ///   only holds when both were produced at the same scale. Making it a parameter is what lets
+    ///   that be checked rather than assumed.
     public static func render(
         _ frame: CanvasFrame,
-        background: PaletteColor = PaletteColor(red: 1, green: 1, blue: 1)
+        chrome: ChartChrome = .light,
+        scale: Double = 1
     ) -> [UInt8]? {
-        guard let canvas = BitmapCanvas(width: width, height: height) else { return nil }
+        let pixelWidth = Int((Double(width) * scale).rounded())
+        let pixelHeight = Int((Double(height) * scale).rounded())
+        guard let canvas = BitmapCanvas(width: pixelWidth, height: pixelHeight) else { return nil }
         let context = canvas.context
-        context.interpolationQuality = .none
+        context.scaleBy(x: CGFloat(scale), y: CGFloat(scale))
 
-        context.setFillColor(components(background))
+        context.setFillColor(chrome.background.cgColor)
         context.fill(CGRect(x: 0, y: 0, width: CGFloat(width), height: CGFloat(height)))
 
         let plot = frame.plotRect
         if plot.width > 1, plot.height > 1 {
-            context.setLineWidth(0.5)
-            context.setStrokeColor(components(PaletteColor(red: 0.8, green: 0.8, blue: 0.8)))
+            context.setLineWidth(CGFloat(chrome.gridWidth))
+            context.setStrokeColor(chrome.grid.cgColor)
             for tick in frame.yTicks {
-                let y = plot.maxY - CGFloat(tick.position) * plot.height
+                let y = PixelSnap.centre(
+                    Double(plot.maxY) - tick.position * Double(plot.height),
+                    width: chrome.gridWidth,
+                    scale: scale
+                )
                 context.move(to: CGPoint(x: plot.minX, y: y))
                 context.addLine(to: CGPoint(x: plot.maxX, y: y))
             }
             context.strokePath()
 
-            context.setLineWidth(1)
-            context.setStrokeColor(components(PaletteColor(red: 0.4, green: 0.4, blue: 0.4)))
-            context.move(to: CGPoint(x: plot.minX, y: plot.minY))
-            context.addLine(to: CGPoint(x: plot.minX, y: plot.maxY))
-            context.addLine(to: CGPoint(x: plot.maxX, y: plot.maxY))
+            context.setLineWidth(CGFloat(chrome.axisWidth))
+            context.setStrokeColor(chrome.axis.cgColor)
+            let left = PixelSnap.centre(Double(plot.minX), width: chrome.axisWidth, scale: scale)
+            let bottom = PixelSnap.centre(Double(plot.maxY), width: chrome.axisWidth, scale: scale)
+            context.move(to: CGPoint(x: left, y: plot.minY))
+            context.addLine(to: CGPoint(x: left, y: bottom))
+            context.addLine(to: CGPoint(x: plot.maxX, y: bottom))
             context.strokePath()
 
             context.setLineWidth(CGFloat(frame.lineWidth))
@@ -68,7 +83,7 @@ public enum OffscreenRenderTarget {
             // reference for what actually ships.
             context.setLineJoin(.bevel)
             for stroke in frame.strokes {
-                context.setStrokeColor(components(stroke.colour))
+                context.setStrokeColor(stroke.colour.cgColor)
                 context.addPath(stroke.path.cgPath)
                 context.strokePath()
             }
@@ -141,11 +156,4 @@ public enum OffscreenRenderTarget {
         return CGImageDestinationFinalize(destination)
     }
 
-    /// Colours come from the one shared helper, which names sRGB explicitly. An earlier version
-    /// built them with `CGColor(red:green:blue:alpha:)`, which is Generic RGB — every stroke
-    /// landed fifteen to twenty levels off, and both backends made the same mistake, so the
-    /// equivalence check between them stayed at zero difference throughout.
-    private static func components(_ colour: PaletteColor) -> CGColor {
-        colour.cgColor
-    }
 }

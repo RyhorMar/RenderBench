@@ -307,12 +307,12 @@ func everySublayerCoversTheChart() {
 @Test
 func aPresentationCopyCarriesPropertiesAndNoSublayers() {
     let original = CoreAnimationChartLayer()
-    original.backgroundFill = PaletteColor(srgb: 0x10, 0x20, 0x30)
+    original.chrome = .dark
     original.renderScale = 2
     original.update(with: prepared(seriesCount: 3))
 
     let copy = CoreAnimationChartLayer(layer: original)
-    #expect(copy.backgroundFill == original.backgroundFill)
+    #expect(copy.chrome == original.chrome)
     #expect(copy.renderScale == 2)
     #expect((copy.sublayers ?? []).isEmpty, "the copy allocated \((copy.sublayers ?? []).count) sublayers")
 }
@@ -341,8 +341,9 @@ func theBackgroundIsSetBeforeAnyFrameArrives() {
     let layer = CoreAnimationChartLayer()
     #expect(layer.backgroundColor != nil)
 
-    layer.backgroundFill = PaletteColor(srgb: 0, 0, 0)
-    #expect(layer.backgroundColor?.components?.first == 0)
+    layer.chrome = .dark
+    #expect(layer.backgroundColor != nil)
+    #expect(layer.backgroundFill == ChartChrome.dark.background)
 
     // A frame too small to draw must not clear it.
     var scratch: [Sample] = []

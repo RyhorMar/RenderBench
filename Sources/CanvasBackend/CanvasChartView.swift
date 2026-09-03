@@ -10,28 +10,23 @@ import SwiftUI
 public struct CanvasChartView: View {
     private let frame: CanvasFrame
     private let recorder: RasterTimeRecorder?
-    private let background: Color
-    private let axisColour: Color
-    private let gridColour: Color
-    private let labelColour: Color
+    private let chrome: ChartChrome
 
-    /// - Parameter recorder: Collects how long the draw pass took. Without one, this backend
-    ///   reports no rasterisation time at all and its published frame cost is preparation plus
-    ///   path building — which is not a rendering method's cost.
+    /// - Parameters:
+    ///   - recorder: Collects how long the draw pass took. Without one, this backend reports no
+    ///     rasterisation time at all and its published frame cost is preparation plus path
+    ///     building — which is not a rendering method's cost.
+    ///   - chrome: Colours and weights for everything that is not a series. Shared with the
+    ///     offscreen reference, so the stored image is a reference for what ships; there were
+    ///     three independent definitions of these colours before.
     public init(
         frame: CanvasFrame,
         recorder: RasterTimeRecorder? = nil,
-        background: Color = Color(white: 0.99),
-        axisColour: Color = .secondary,
-        gridColour: Color = Color.secondary.opacity(0.18),
-        labelColour: Color = .secondary
+        chrome: ChartChrome = .light
     ) {
         self.frame = frame
         self.recorder = recorder
-        self.background = background
-        self.axisColour = axisColour
-        self.gridColour = gridColour
-        self.labelColour = labelColour
+        self.chrome = chrome
     }
 
     public var body: some View {
@@ -51,7 +46,7 @@ public struct CanvasChartView: View {
     /// Split out so the measurement covers the rasterisation and nothing else — and so that what
     /// is being timed is visible at the call site rather than buried in a closure.
     private func draw(in context: inout GraphicsContext, size: CGSize) {
-        context.fill(Path(CGRect(origin: .zero, size: size)), with: .color(background))
+        context.fill(Path(CGRect(origin: .zero, size: size)), with: .color(colour(chrome.background)))
         drawContents(&context)
     }
 
@@ -65,13 +60,13 @@ public struct CanvasChartView: View {
                 grid.move(to: CGPoint(x: plot.minX, y: y))
                 grid.addLine(to: CGPoint(x: plot.maxX, y: y))
             }
-            context.stroke(grid, with: .color(gridColour), lineWidth: 0.5)
+            context.stroke(grid, with: .color(colour(chrome.grid)), lineWidth: chrome.gridWidth)
 
             var axes = Path()
             axes.move(to: CGPoint(x: plot.minX, y: plot.minY))
             axes.addLine(to: CGPoint(x: plot.minX, y: plot.maxY))
             axes.addLine(to: CGPoint(x: plot.maxX, y: plot.maxY))
-            context.stroke(axes, with: .color(axisColour), lineWidth: 1)
+            context.stroke(axes, with: .color(colour(chrome.axis)), lineWidth: chrome.axisWidth)
 
             // One style for every series: only the colour varies, and rebuilding the value inside
             // the loop allocated per series per frame. Bevel rather than round joins — at roughly
@@ -104,7 +99,7 @@ public struct CanvasChartView: View {
     private func label(_ text: String) -> Text {
         Text(text)
             .font(.system(size: 9, design: .monospaced))
-            .foregroundStyle(labelColour)
+            .foregroundStyle(colour(chrome.label))
     }
 
     private func colour(_ palette: PaletteColor) -> Color {

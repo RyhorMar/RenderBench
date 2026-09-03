@@ -57,10 +57,15 @@ public final class CoreAnimationChartLayer: CALayer {
     /// short-circuit that would skip the work can never fire.
     private var appliedStyle: [ObjectIdentifier: (colour: PaletteColor, width: Double)] = [:]
 
-    /// Background fill, matching the offscreen reference so the two backends can be compared.
-    public var backgroundFill = PaletteColor(red: 1, green: 1, blue: 1) {
-        didSet { backgroundColor = backgroundFill.cgColor }
+    /// Colours and weights for everything that is not a series, shared with the Canvas backend
+    /// and with the offscreen reference. Three independent definitions of these disagreed before.
+    public var chrome: ChartChrome = .light {
+        didSet { applyChrome() }
     }
+
+    /// Background fill. Kept under its own name because it is a layer property the compositor
+    /// reads, but it is the chrome's and not a separate setting.
+    public var backgroundFill: PaletteColor { chrome.background }
 
     /// Device pixels per point. **Must be set by the host** from the screen it draws on.
     ///
@@ -86,7 +91,7 @@ public final class CoreAnimationChartLayer: CALayer {
     public override init(layer: Any) {
         super.init(layer: layer)
         if let source = layer as? CoreAnimationChartLayer {
-            backgroundFill = source.backgroundFill
+            chrome = source.chrome
             renderScale = source.renderScale
         }
     }
@@ -97,19 +102,23 @@ public final class CoreAnimationChartLayer: CALayer {
     }
 
     private func commonSetup() {
-        backgroundColor = backgroundFill.cgColor
         gridLayer.fillColor = nil
-        gridLayer.lineWidth = 0.5
-        gridLayer.strokeColor = PaletteColor(red: 0.8, green: 0.8, blue: 0.8).cgColor
         axisLayer.fillColor = nil
-        axisLayer.lineWidth = 1
-        axisLayer.strokeColor = PaletteColor(red: 0.4, green: 0.4, blue: 0.4).cgColor
+        applyChrome()
         for layer in [gridLayer, axisLayer] {
             suppressActions(on: layer)
             addSublayer(layer)
         }
         suppressActions(on: self)
         applyScale()
+    }
+
+    private func applyChrome() {
+        backgroundColor = chrome.background.cgColor
+        gridLayer.lineWidth = CGFloat(chrome.gridWidth)
+        gridLayer.strokeColor = chrome.grid.cgColor
+        axisLayer.lineWidth = CGFloat(chrome.axisWidth)
+        axisLayer.strokeColor = chrome.axis.cgColor
     }
 
     /// Turns off implicit animation as a property of the layer, not of one call site.

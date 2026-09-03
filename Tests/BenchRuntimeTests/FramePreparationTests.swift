@@ -138,3 +138,44 @@ func aRefusedSeriesIsReportedAndNotProjected() {
     #expect(frame.series.isEmpty)
     #expect(frame.pointsSubmitted == 0)
 }
+
+/// A one-point stroke centred on an integer coordinate spans half a pixel either side, so it
+/// rasterises as two columns at half coverage rather than one crisp line. The offset has to know
+/// the device scale, which is why nothing here could snap while no scale existed.
+@Test
+func anOddWidthStrokeIsCentredOnAPixel() {
+    // Odd or even is a property of the stroke in *device* pixels, not in points. One point at
+    // scale 1 is one pixel — odd, so it centres on a pixel and lands on a half. At scale 2 the
+    // same line is two pixels — even, so it straddles a boundary and an integer point coordinate
+    // is already right. At scale 3 it is three pixels, odd again, half a device pixel off.
+    #expect(PixelSnap.centre(52.0, width: 1, scale: 1) == 52.5)
+    #expect(PixelSnap.centre(52.4, width: 1, scale: 1) == 52.5)
+    #expect(PixelSnap.centre(52.0, width: 1, scale: 2) == 52.0)
+    #expect(abs(PixelSnap.centre(52.0, width: 1, scale: 3) - (52.0 + 1.0 / 6.0)) < 1e-12)
+}
+
+/// An even-width stroke straddles a boundary instead, so it snaps to the boundary and not past it.
+@Test
+func anEvenWidthStrokeIsCentredOnABoundary() {
+    #expect(PixelSnap.centre(52.3, width: 2, scale: 1) == 52.0)
+    #expect(PixelSnap.centre(52.7, width: 2, scale: 1) == 53.0)
+}
+
+@Test
+func snappingIsAPassThroughWithoutAScale() {
+    #expect(PixelSnap.centre(52.3, width: 1, scale: 0) == 52.3)
+}
+
+/// One definition of the furniture. There were three, and a reference image was therefore a
+/// reference for a chart nobody was looking at.
+@Test
+func theTwoSchemesDifferInEveryElement() {
+    let light = ChartChrome.light
+    let dark = ChartChrome.dark
+    #expect(light.background != dark.background)
+    #expect(light.grid != dark.grid)
+    #expect(light.axis != dark.axis)
+    #expect(light.label != dark.label)
+    #expect(ChartChrome.forScheme(dark: true) == dark)
+    #expect(ChartChrome.forScheme(dark: false) == light)
+}
