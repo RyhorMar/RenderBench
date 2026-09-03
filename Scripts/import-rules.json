@@ -1,0 +1,33 @@
+{
+  "comment": "Which modules each target may import. `system` lists system frameworks; `local` lists other targets in this package. Anything absent from both is a violation. Keep in sync with the target graph in Package.swift: CheckImports fails when a source directory has no entry here.",
+  "targets": {
+    "BenchCore": {
+      "system": ["Foundation"],
+      "local": []
+    },
+    "BenchScales": {
+      "system": ["Foundation"],
+      "local": ["BenchCore"]
+    },
+    "BenchDownsampling": {
+      "system": ["Foundation"],
+      "local": ["BenchCore", "BenchScales"]
+    },
+    "BenchGenerators": {
+      "system": ["Foundation"],
+      "local": ["BenchCore"]
+    },
+    "BenchRuntime": {
+      "system": ["Foundation", "Synchronization", "QuartzCore", "Metal", "os"],
+      "local": ["BenchCore", "BenchScales", "BenchDownsampling"]
+    },
+    "BenchTestSupport": {
+      "system": ["Foundation"],
+      "local": ["BenchCore", "BenchScales"]
+    },
+    "CanvasBackend": {
+      "system": ["Foundation", "SwiftUI", "CoreGraphics"],
+      "local": ["BenchCore", "BenchScales", "BenchDownsampling", "BenchRuntime"]
+    }
+  }
+}

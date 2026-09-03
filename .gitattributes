@@ -1,0 +1,2 @@
+*.metal linguist-language=Metal
+*.md linguist-documentation
