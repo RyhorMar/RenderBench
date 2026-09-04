@@ -33,6 +33,8 @@ private func prepared(_ spec: LineChartSpec, shiftedBy shift: Double = 0) -> Pre
         window: window,
         yDomain: yDomain,
         size: (width: Double(ComparisonImage.width), height: Double(ComparisonImage.height)),
+        chrome: .forScheme(dark: false),
+        scale: 1,
         dark: false,
         measuring: ApproximateTextWidth(),
         scratch: &scratch
@@ -143,6 +145,7 @@ func withNoPartialCoverageBothRasterisersAgreeToTheByte() throws {
     let frame = FramePreparation.prepare(
         provider: flat, spec: spec, window: window, yDomain: yDomain,
         size: (width: Double(ComparisonImage.width), height: Double(ComparisonImage.height)),
+        chrome: .forScheme(dark: false), scale: 1,
         dark: false, measuring: ApproximateTextWidth(), scratch: &scratch
     )
     var referenceScratch: [Sample] = []

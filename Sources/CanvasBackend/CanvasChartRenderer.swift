@@ -31,6 +31,8 @@ public enum CanvasChartRenderer {
             window: window,
             yDomain: yDomain,
             size: (width: Double(size.width), height: Double(size.height)),
+            chrome: .forScheme(dark: dark),
+            scale: 1,
             dark: dark,
             measuring: measuring,
             scratch: &scratch

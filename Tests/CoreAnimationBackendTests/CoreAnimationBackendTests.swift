@@ -48,6 +48,8 @@ private func prepared(seriesCount: Int = 8) -> PreparedFrame {
         window: window,
         yDomain: yDomain,
         size: size,
+        chrome: .forScheme(dark: false),
+        scale: 1,
         dark: false,
         measuring: ApproximateTextWidth(),
         scratch: &scratch
@@ -162,6 +164,8 @@ func aGapBreaksTheLineRatherThanBeingDrawnThrough() {
         window: window,
         yDomain: -1.4...1.4,
         size: size,
+        chrome: .forScheme(dark: false),
+        scale: 1,
         dark: false,
         measuring: ApproximateTextWidth(),
         scratch: &scratch
@@ -244,6 +248,8 @@ func aRefusedSeriesIsCarriedThroughRatherThanDropped() {
         window: window,
         yDomain: 0...40,
         size: size,
+        chrome: .forScheme(dark: false),
+        scale: 1,
         dark: false,
         measuring: ApproximateTextWidth(),
         scratch: &scratch
@@ -353,6 +359,8 @@ func theBackgroundIsSetBeforeAnyFrameArrives() {
         window: window,
         yDomain: yDomain,
         size: (width: 10, height: 10),
+        chrome: .forScheme(dark: false),
+        scale: 1,
         dark: false,
         measuring: ApproximateTextWidth(),
         scratch: &scratch

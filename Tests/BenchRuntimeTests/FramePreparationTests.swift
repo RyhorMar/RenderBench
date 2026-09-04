@@ -30,6 +30,8 @@ private func prepare(
         window: window,
         yDomain: yDomain,
         size: (width: 1_024, height: 768),
+        chrome: .forScheme(dark: false),
+        scale: 1,
         dark: false,
         measuring: FixedWidth(),
         scratch: &scratch
@@ -107,6 +109,8 @@ func aPlotTooSmallToDrawIsReportedRatherThanNegative() {
         window: 0...10,
         yDomain: -1...1,
         size: (width: 10, height: 10),
+        chrome: .forScheme(dark: false),
+        scale: 1,
         dark: false,
         measuring: FixedWidth(),
         scratch: &scratch
@@ -130,6 +134,8 @@ func aRefusedSeriesIsReportedAndNotProjected() {
         window: 0...10,
         yDomain: 0...30,
         size: (width: 1_024, height: 768),
+        chrome: .forScheme(dark: false),
+        scale: 1,
         dark: false,
         measuring: FixedWidth(),
         scratch: &scratch

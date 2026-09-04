@@ -80,6 +80,8 @@ public struct PreparedFrame: Sendable {
     public var pointsSubmitted: Int
     /// Nanoseconds spent windowing, reducing and projecting.
     public var prepareNs: UInt64
+    /// The grid, axes and labels, laid out once for every backend to stroke.
+    public var chrome: ChromeLayout = .empty
 
     public init(plotRect: PlotRect = PlotRect(x: 0, y: 0, width: 0, height: 0)) {
         self.plotRect = plotRect
@@ -113,6 +115,8 @@ public enum FramePreparation {
         window: ClosedRange<Carrier>,
         yDomain: ClosedRange<Double>,
         size: (width: Double, height: Double),
+        chrome: ChartChrome,
+        scale: Double,
         dark: Bool,
         measuring: some TextMeasuring,
         scratch: inout [Sample]
@@ -207,6 +211,10 @@ public enum FramePreparation {
                 ).map { PlottedTick(position: yScale.map($0.value).normalised, label: $0.label) }
             }
         }
+
+        frame.chrome = ChromeLayout.build(
+            plot: plot, xTicks: frame.xTicks, yTicks: frame.yTicks, chrome: chrome, scale: scale
+        )
 
         frame.prepareNs = elapsed.nanoseconds
         return frame
