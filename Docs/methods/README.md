@@ -21,6 +21,7 @@ what each one costs and where each one lies.
 | [Shape and Path](shape-path.md) | retained SwiftUI `Shape` per series, index-marked breaks | no |
 | [Core Image](core-image.md) | CPU raster delivered through a `CIColorControls` GPU filter | no |
 | [SceneKit](scenekit.md) | 2D chart as `.line`-primitive geometry in a 3D scene, orthographic camera | no |
+| [Shader](shader.md) | analytic segment-distance coverage in a SwiftUI `colorEffect` fragment program | no |
 
 ## What each page contains
 

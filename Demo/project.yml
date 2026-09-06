@@ -65,6 +65,12 @@ targets:
       - path: Tests
     dependencies:
       - target: RenderBenchDemo
+      # The one package product no other demo target needs: `ShaderBackend`'s shader only
+      # compiles inside this app's own bundle, so the equivalence test that proves it works
+      # links the package product directly rather than reaching it through `RenderBenchDemo`,
+      # which does not otherwise depend on it — this backend is not wired into `Catalogue`.
+      - package: RenderBench
+        product: ShaderBackend
     settings:
       base:
         CODE_SIGNING_ALLOWED: NO

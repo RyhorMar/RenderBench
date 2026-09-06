@@ -45,6 +45,7 @@ let package = Package(
         .library(name: "ShapePathBackend", targets: ["ShapePathBackend"]),
         .library(name: "CoreImageBackend", targets: ["CoreImageBackend"]),
         .library(name: "SceneKitBackend", targets: ["SceneKitBackend"]),
+        .library(name: "ShaderBackend", targets: ["ShaderBackend"]),
     ],
     targets: [
         // MARK: Layers
@@ -173,6 +174,21 @@ let package = Package(
             swiftSettings: strictMainActor
         ),
 
+        // Eighth of the nine, and the first whose drawing primitive is a program run once per
+        // pixel rather than a shape, a layer or a vertex buffer: SwiftUI's `colorEffect` hands
+        // every pixel of a `Rectangle` to a `[[stitchable]]` Metal function that measures its
+        // distance to a line segment analytically. The shader itself cannot live in this target —
+        // SwiftPM does not compile `.metal` files, and `colorEffect` has no source-string
+        // equivalent to `MTLDevice.makeLibrary(source:)` the way `MetalBackend` uses — so it is
+        // compiled by Xcode into the demo's own bundle; see `ShaderRenderTarget`. Main-actor by
+        // default like the other SwiftUI-hosted backends, for the same reason — `@Observable`
+        // state a SwiftUI view reads.
+        .target(
+            name: "ShaderBackend",
+            dependencies: ["BenchCore", "BenchRuntime", "BenchHost"],
+            swiftSettings: strictMainActor
+        ),
+
         // MARK: Tooling
 
         // The dependency rule is machine-checked because nothing else enforces it: SwiftPM does
@@ -251,6 +267,11 @@ let package = Package(
         .testTarget(
             name: "SceneKitBackendTests",
             dependencies: ["SceneKitBackend", "BenchHost", "BenchScales", "BenchTestSupport"],
+            swiftSettings: strictMainActor
+        ),
+        .testTarget(
+            name: "ShaderBackendTests",
+            dependencies: ["ShaderBackend", "BenchHost", "BenchScales", "BenchTestSupport"],
             swiftSettings: strictMainActor
         ),
     ]

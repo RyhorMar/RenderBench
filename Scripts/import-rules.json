@@ -375,6 +375,32 @@
         "BenchHost",
         "SceneKitBackend"
       ]
+    },
+    "Sources/ShaderBackend": {
+      "system": [
+        "Foundation",
+        "SwiftUI"
+      ],
+      "local": [
+        "BenchCore",
+        "BenchRuntime",
+        "BenchHost"
+      ]
+    },
+    "Tests/ShaderBackendTests": {
+      "system": [
+        "Foundation",
+        "Testing",
+        "SwiftUI"
+      ],
+      "local": [
+        "BenchCore",
+        "BenchRuntime",
+        "BenchScales",
+        "BenchTestSupport",
+        "BenchHost",
+        "ShaderBackend"
+      ]
     }
   }
 }
