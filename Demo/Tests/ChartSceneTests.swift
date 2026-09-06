@@ -60,7 +60,10 @@ func switchingTheRendererTearsDownTheOutgoingOne() {
 /// sets both ways catches that; comparing only "every catalogue id has a literal" would not.
 @MainActor @Test
 func theArgumentListNamesEveryCatalogueEntry() {
-    let literalIDs: Set<String> = ["canvas", "core-animation", "metal"]
+    let literalIDs: Set<String> = [
+        "canvas", "core-animation", "metal", "swift-charts", "shape-path", "core-image",
+        "scenekit", "shader",
+    ]
     #expect(literalIDs == Set(Catalogue.renderers.map(\.id)))
 }
 

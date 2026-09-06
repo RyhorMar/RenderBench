@@ -57,6 +57,16 @@ targets:
         product: CoreAnimationBackend
       - package: RenderBench
         product: MetalBackend
+      - package: RenderBench
+        product: SwiftChartsBackend
+      - package: RenderBench
+        product: ShapePathBackend
+      - package: RenderBench
+        product: CoreImageBackend
+      - package: RenderBench
+        product: SceneKitBackend
+      - package: RenderBench
+        product: ShaderBackend
 
   RenderBenchDemoTests:
     type: bundle.unit-test
@@ -65,10 +75,9 @@ targets:
       - path: Tests
     dependencies:
       - target: RenderBenchDemo
-      # The one package product no other demo target needs: `ShaderBackend`'s shader only
-      # compiles inside this app's own bundle, so the equivalence test that proves it works
-      # links the package product directly rather than reaching it through `RenderBenchDemo`,
-      # which does not otherwise depend on it — this backend is not wired into `Catalogue`.
+      # `ShaderBackend`'s shader only compiles inside this app's own bundle, so the equivalence
+      # test that proves it works links the package product directly rather than reaching it
+      # through `RenderBenchDemo`.
       - package: RenderBench
         product: ShaderBackend
     settings:

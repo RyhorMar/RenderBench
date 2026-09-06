@@ -1,7 +1,12 @@
 import BenchHost
 import CanvasBackend
 import CoreAnimationBackend
+import CoreImageBackend
 import MetalBackend
+import SceneKitBackend
+import ShaderBackend
+import ShapePathBackend
+import SwiftChartsBackend
 
 /// The backends this screen can switch between.
 ///
@@ -16,5 +21,10 @@ enum Catalogue {
         RendererEntry(CanvasRenderer.self),
         RendererEntry(CoreAnimationRenderer.self),
         RendererEntry(MetalRenderer.self),
+        RendererEntry(SwiftChartsRenderer.self),
+        RendererEntry(ShapePathRenderer.self),
+        RendererEntry(CoreImageRenderer.self),
+        RendererEntry(SceneKitRenderer.self),
+        RendererEntry(ShaderRenderer.self),
     ]
 }
