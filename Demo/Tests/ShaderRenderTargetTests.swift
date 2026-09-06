@@ -1,5 +1,6 @@
 import BenchCore
 import BenchRuntime
+import BenchScales
 import Foundation
 import ShaderBackend
 import Testing
@@ -38,6 +39,7 @@ private func eightCurves() -> ArrayProvider {
     return ArrayProvider(series, metadata: metadata)
 }
 
+@MainActor
 private func prepared(_ spec: LineChartSpec, shiftedBy shift: Double = 0) -> PreparedFrame {
     var scratch: [Sample] = []
     var frame = FramePreparation.prepare(
@@ -63,6 +65,7 @@ private func prepared(_ spec: LineChartSpec, shiftedBy shift: Double = 0) -> Pre
     return frame
 }
 
+@MainActor
 private func eightCurvesPrepared() -> PreparedFrame { prepared(LineChartSpec(series: Array(0..<8))) }
 
 /// BGR triples the palette renders as at full coverage.

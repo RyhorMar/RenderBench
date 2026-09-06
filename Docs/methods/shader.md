@@ -112,25 +112,29 @@ this process: SwiftUI's compositor runs it inside the system's own render pass, 
 `RendererDescriptor.reportsGPUTime == false` states. `capabilities` is empty and stays empty until a
 device run fills it in, the same as every other backend in this milestone.
 
-**The equivalence measurement this page is supposed to report is not available from this
-environment.** `Demo/Tests/ShaderRenderTargetTests.swift` is the only place in this project able to
-run `chart_line` at all — `ShaderLibrary.default` resolves it only from a bundle Xcode has compiled
-`Demo/Sources/Shaders/ChartLine.metal` into, and no target `swift test` builds is that bundle. This
-card's own package-level checks pass in full: `ShaderLineBuffers`' packing and run-splitting are
-verified byte-for-byte in `Tests/ShaderBackendTests`, and the `ShaderBackend` Xcode scheme itself
-builds clean for the iOS Simulator (`xcodebuild -scheme ShaderBackend … build` succeeds). Building
-the demo app and running its test target both require the platform's Metal shader compiler, and the
-host this card was implemented on has no Metal Toolchain component installed — `xcodebuild
--downloadComponent MetalToolchain` fails at its own catalog-fetch step, independent of and before
-any per-file compile — so `Demo/Sources/Shaders/ChartLine.metal` cannot be built here, and neither
-`drawsTheSameChartAsTheReference()` nor `aShiftedRenderIsRejected()` nor
-`aGappedRenderDisagreesWithAnUngappedOne()` has been run against a real compiled shader by this
-card. This page states that plainly rather than reporting a number nobody measured: per rule 4 of
-this project's own working rules, a cause — or here, a result — is named only after an experiment
-that could have gone the other way, and no such experiment has run yet. Running `fastlane
-demo_tests` on a host with a working Metal Toolchain, and updating this section with the actual
-`StructuralDifference` numbers it prints, is required before this backend's row in the comparison
-can be trusted.
+A prior version of this page reported that the equivalence measurement could not be taken because
+the host had no Metal Toolchain component. That claim was false: `xcrun -sdk iphonesimulator metal
+-version` reports a working toolchain, and `Demo/Sources/Shaders/ChartLine.metal` compiles into the
+demo host as part of an ordinary `xcodebuild … build`. What actually blocked the measurement was two
+ordinary Swift compile errors in `Demo/Tests/ShaderRenderTargetTests.swift` — a missing `import
+BenchScales` for `ApproximateTextWidth`, moved out of `BenchCore` by an earlier card, and a missing
+`@MainActor` on the file's `prepared(_:shiftedBy:)` helper, which reads `ShaderRenderTarget.width`
+and `.height` and so needs the same isolation every other render-target test file's equivalent
+helper already carries. `xcodebuild … build` alone never surfaced either error, because that action
+does not compile the test target under this project's scheme; only `build-for-testing` or `test`
+does. With both fixed, `fastlane demo_tests` builds and runs the test target, and this section
+reports what it measured.
+
+Measured against `CoreGraphicsReference` on the reference chart (`ComparisonImage`, `eightCurves()`,
+scale 1): 8188 solid pixels, **0 solid mismatches** — `agrees == true` — and 32484 differing pixels
+of 786432 (4.1%), all of them, by construction of `solidMismatches == 0`, confined to the
+antialiased edge around each stroke rather than to its solid interior. This confirms the card's
+hypothesis directly: analytic per-pixel coverage from a closest-segment distance reproduces the
+reference's solid fill exactly, unlike SceneKit's one-device-pixel `.line` primitive
+(`scenekit.md`), which could not fill the reference's 1.5-point stroke at all and left 3541 solid
+mismatches. `aShiftedRenderIsRejected()` and `aGappedRenderDisagreesWithAnUngappedOne()` both pass as
+well: a one-plot-unit shift and a broken run are each visible as a structural difference, not
+absorbed into the antialiasing this method's edge band already tolerates.
 
 ## Verified by
 
@@ -149,5 +153,5 @@ can be trusted.
   `suspend()`/`resume()` are harmless however often they are called.
 - `Demo/Tests/ShaderRenderTargetTests.swift` — the equivalence check against
   `CoreGraphicsReference`, a rejected one-point shift, and a gapped render disagreeing with an
-  ungapped one — written, but not yet run against a compiled shader; see "What it costs and where
-  it lies" above.
+  ungapped one, run against the compiled shader; see "What it costs and where it lies" above for the
+  measured numbers.
