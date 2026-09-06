@@ -43,6 +43,8 @@
         "Synchronization",
         "QuartzCore",
         "CoreGraphics",
+        "ImageIO",
+        "UniformTypeIdentifiers",
         "Metal",
         "os"
       ],
@@ -64,10 +66,7 @@
     "Sources/CanvasBackend": {
       "system": [
         "Foundation",
-        "SwiftUI",
-        "CoreGraphics",
-        "ImageIO",
-        "UniformTypeIdentifiers"
+        "SwiftUI"
       ],
       "local": [
         "BenchCore",

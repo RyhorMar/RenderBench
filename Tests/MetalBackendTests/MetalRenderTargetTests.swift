@@ -51,10 +51,7 @@ private func prepared(_ spec: LineChartSpec, shiftedBy shift: Double = 0) -> Pre
 }
 
 private func coreGraphicsReference(_ spec: LineChartSpec) -> [UInt8] {
-    var scratch: [Sample] = []
-    return OffscreenRenderTarget.render(
-        provider: curves(8), spec: spec, window: window, yDomain: yDomain, scratch: &scratch
-    ) ?? []
+    CoreGraphicsReference.render(prepared(spec)) ?? []
 }
 
 /// BGR triples the palette renders as at full coverage.
@@ -170,10 +167,7 @@ func withNoPartialCoverageBothRasterisersAgreeToTheByte() throws {
         chrome: .forScheme(dark: false), scale: 1,
         dark: false, measuring: ApproximateTextWidth(), scratch: &scratch
     )
-    var referenceScratch: [Sample] = []
-    guard let reference = OffscreenRenderTarget.render(
-        provider: flat, spec: spec, window: window, yDomain: yDomain, scratch: &referenceScratch
-    ) else {
+    guard let reference = CoreGraphicsReference.render(frame) else {
         Issue.record("could not create a bitmap context")
         return
     }

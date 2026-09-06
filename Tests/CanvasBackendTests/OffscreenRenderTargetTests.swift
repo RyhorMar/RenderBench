@@ -150,7 +150,7 @@ func theStoredReferenceStillMatches() throws {
 
     if ProcessInfo.processInfo.environment["WRITE_GOLDENS"] != nil {
         try FileManager.default.createDirectory(at: goldens, withIntermediateDirectories: true)
-        #expect(OffscreenRenderTarget.writePNG(pixels, to: file))
+        #expect(CoreGraphicsReference.writePNG(pixels, to: file))
         return
     }
 

@@ -75,7 +75,7 @@ func twoRendersOfOneFrameAreBitIdentical() {
 @Test
 func theTwoBackendsDrawTheSamePicture() {
     let frame = prepared()
-    guard let canvas = OffscreenRenderTarget.render(CanvasChartRenderer.encode(frame)),
+    guard let canvas = CoreGraphicsReference.render(frame),
           let layers = CoreAnimationRenderTarget.render(frame)
     else {
         Issue.record("could not create a bitmap context")
@@ -183,7 +183,7 @@ func aGapBreaksTheLineRatherThanBeingDrawnThrough() {
     #expect(result.pointsDrawn == frame.pointsSubmitted - breaks)
 
     // And it draws the same picture as the Canvas backend on the same gapped frame.
-    guard let canvas = OffscreenRenderTarget.render(CanvasChartRenderer.encode(frame)),
+    guard let canvas = CoreGraphicsReference.render(frame),
           let layers = CoreAnimationRenderTarget.render(frame)
     else {
         Issue.record("could not create a bitmap context")
