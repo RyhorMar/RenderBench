@@ -45,8 +45,10 @@ public enum CoreGraphicsReference {
 
             context.setLineWidth(CGFloat(frame.lineWidth))
             context.setLineCap(.round)
-            // Bevel: matches both backends' on-screen stroke style, so the reference is a
-            // reference for what actually ships.
+            // Bevel matches the Canvas and Core Animation backends' on-screen stroke style. The
+            // GPU backend's join differs by construction — it extends segments instead of
+            // emitting join geometry — so it is compared against this reference through a
+            // structural equivalence check, not byte equality.
             context.setLineJoin(.bevel)
             for series in frame.series {
                 context.setStrokeColor(series.colour.cgColor)
