@@ -21,27 +21,23 @@ public enum OffscreenRenderTarget {
     /// Bytes per pixel: 8-bit BGRA, premultiplied.
     public static let bytesPerPixel = ComparisonImage.bytesPerPixel
 
-    /// Renders a frame and returns the raw premultiplied BGRA bytes.
+    /// Renders a frame at a pinned configuration and returns raw premultiplied BGRA bytes.
     ///
     /// Antialiasing is on and interpolation is off. Both are stated rather than left to the
     /// context's defaults, because a default that changes between OS versions would silently
     /// invalidate every stored reference image.
     ///
     /// - Parameters:
-    ///   - frame: Geometry to draw, already prepared. Its `plotRect` must match this target's
-    ///     size, which `frame(for:spec:window:yDomain:dark:measuring:scratch:)` guarantees.
-    ///   - background: Fill drawn before the frame. White by default, so a stored reference is
-    ///     legible on its own.
+    ///   - frame: Geometry to draw, already prepared, background and chrome included. Its
+    ///     `plotRect` must match this target's size, which
+    ///     `render(provider:spec:window:yDomain:dark:scratch:)` guarantees.
+    ///   - scale: Device pixels per point. The reference is produced at 1 by default and the
+    ///     screen draws at 2 or 3, so a statement relating this image to a device's rendering
+    ///     only holds when both were produced at the same scale. Making it a parameter is what
+    ///     lets that be checked rather than assumed.
     /// - Returns: `width * height * 4` bytes, or `nil` when a context could not be created.
-    /// Renders a frame at a pinned configuration and returns raw premultiplied BGRA bytes.
-    ///
-    /// - Parameter scale: Device pixels per point. The reference is produced at 1 by default and
-    ///   the screen draws at 2 or 3, so a statement relating this image to a device's rendering
-    ///   only holds when both were produced at the same scale. Making it a parameter is what lets
-    ///   that be checked rather than assumed.
     public static func render(
         _ frame: CanvasFrame,
-        chrome: ChartChrome = .light,
         scale: Double = 1
     ) -> [UInt8]? {
         let pixelWidth = Int((Double(width) * scale).rounded())
@@ -50,32 +46,12 @@ public enum OffscreenRenderTarget {
         let context = canvas.context
         context.scaleBy(x: CGFloat(scale), y: CGFloat(scale))
 
-        context.setFillColor(chrome.background.cgColor)
+        context.setFillColor(frame.chrome.background.cgColor)
         context.fill(CGRect(x: 0, y: 0, width: CGFloat(width), height: CGFloat(height)))
 
         let plot = frame.plotRect
         if plot.width > 1, plot.height > 1 {
-            context.setLineWidth(CGFloat(chrome.gridWidth))
-            context.setStrokeColor(chrome.grid.cgColor)
-            for tick in frame.yTicks {
-                let y = PixelSnap.centre(
-                    Double(plot.maxY) - tick.position * Double(plot.height),
-                    width: chrome.gridWidth,
-                    scale: scale
-                )
-                context.move(to: CGPoint(x: plot.minX, y: y))
-                context.addLine(to: CGPoint(x: plot.maxX, y: y))
-            }
-            context.strokePath()
-
-            context.setLineWidth(CGFloat(chrome.axisWidth))
-            context.setStrokeColor(chrome.axis.cgColor)
-            let left = PixelSnap.centre(Double(plot.minX), width: chrome.axisWidth, scale: scale)
-            let bottom = PixelSnap.centre(Double(plot.maxY), width: chrome.axisWidth, scale: scale)
-            context.move(to: CGPoint(x: left, y: plot.minY))
-            context.addLine(to: CGPoint(x: left, y: bottom))
-            context.addLine(to: CGPoint(x: plot.maxX, y: bottom))
-            context.strokePath()
+            strokeChrome(frame.chrome.lines, in: context)
 
             context.setLineWidth(CGFloat(frame.lineWidth))
             context.setLineCap(.round)
@@ -93,6 +69,30 @@ public enum OffscreenRenderTarget {
         // on the text engine's version, so including it would make a stored reference invalid on a
         // machine that draws the same chart correctly. Equivalence is about the data path.
         return canvas.pixels()
+    }
+
+    /// Strokes lines that share a colour and width as one continuous path, chaining rather than
+    /// moving wherever one line continues the last. The grid's lines never do; the two axis lines
+    /// always do, and that turns their shared corner into a joined stroke instead of two
+    /// butt-capped ends that would leave it a pixel short of what a single path draws.
+    private static func strokeChrome(_ lines: [ChromeLine], in context: CGContext) {
+        var index = 0
+        while index < lines.count {
+            let style = lines[index]
+            context.setLineWidth(CGFloat(style.width))
+            context.setStrokeColor(style.colour.cgColor)
+            var previousEnd: CGPoint?
+            while index < lines.count, lines[index].colour == style.colour, lines[index].width == style.width {
+                let line = lines[index]
+                let start = CGPoint(x: line.x0, y: line.y0)
+                if previousEnd != start { context.move(to: start) }
+                let end = CGPoint(x: line.x1, y: line.y1)
+                context.addLine(to: end)
+                previousEnd = end
+                index += 1
+            }
+            context.strokePath()
+        }
     }
 
     /// Prepares and renders in one step, at this target's fixed size.

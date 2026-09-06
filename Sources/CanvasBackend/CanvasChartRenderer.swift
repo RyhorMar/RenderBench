@@ -54,6 +54,7 @@ public enum CanvasChartRenderer {
         )
         frame.plotRect = plot
         frame.lineWidth = prepared.lineWidth
+        frame.chrome = prepared.chrome
         frame.failures = prepared.failures
         frame.xTicks = prepared.xTicks
         frame.yTicks = prepared.yTicks

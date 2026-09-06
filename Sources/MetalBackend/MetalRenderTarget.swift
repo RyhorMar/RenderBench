@@ -52,13 +52,12 @@ public final class MetalRenderTarget {
     /// Draws a frame and returns raw premultiplied BGRA bytes, `width * height * 4 * scale²`.
     public func render(
         _ frame: PreparedFrame,
-        chrome: ChartChrome = .light,
         scale: Double = 1,
         extendSegments: Bool = true
     ) throws(MetalRendererError) -> [UInt8] {
         let pixelWidth = Int((Double(Self.width) * scale).rounded())
         let pixelHeight = Int((Double(Self.height) * scale).rounded())
-        let geometry = MetalChartGeometry.build(frame, chrome: chrome, scale: scale, extendSegments: extendSegments)
+        let geometry = MetalChartGeometry.build(frame, scale: scale, extendSegments: extendSegments)
 
         let resolveDescriptor = MTLTextureDescriptor.texture2DDescriptor(
             pixelFormat: Self.pixelFormat,
@@ -99,7 +98,7 @@ public final class MetalRenderTarget {
         try renderer.draw(
             geometry,
             viewportPixels: SIMD2<Float>(Float(pixelWidth), Float(pixelHeight)),
-            clearColour: chrome.background,
+            clearColour: frame.chrome.background,
             descriptor: pass,
             in: commandBuffer
         )

@@ -99,6 +99,28 @@ func theBackgroundIsTheChromeColourExactly() throws {
     #expect(pixels[3] == 255)
 }
 
+/// The axes reach the GPU render in the chrome's own colour, not the grid's and not a stray one.
+/// Rendered with no series at all: two one-point-wide axis lines are a small fraction of this
+/// bitmap, small enough that the structural comparison against Core Graphics — built to judge
+/// solid series pixels — does not weigh in on them either way.
+@Test
+func theAxesAreDrawnInTheChromeColour() throws {
+    guard let target = MetalRenderTarget() else { return }
+    let pixels = try target.render(prepared(LineChartSpec(series: [])))
+    let expected = ChartChrome.light.axis.encodedSRGB
+    let blue = UInt8((expected.blue * 255).rounded())
+    let green = UInt8((expected.green * 255).rounded())
+    let red = UInt8((expected.red * 255).rounded())
+    var covered = 0
+    for index in stride(from: 0, to: pixels.count, by: 4)
+    where pixels[index] == blue && pixels[index + 1] == green && pixels[index + 2] == red {
+        covered += 1
+    }
+    // Comfortably above what either axis line alone would cover (the shorter, the bottom one, at
+    // roughly 960 pixels) and below both together (roughly 1 696): only their sum clears it.
+    #expect(covered > 1_200, "only \(covered) axis-coloured pixels; an axis line may be missing")
+}
+
 /// Colours reach the GPU linear and the target encodes them, so a chart drawn through the shader
 /// must be the same colour as one drawn through Core Graphics. Asserting the palette value exactly
 /// is what makes this a check: the version of this test that compared "roughly blue" passed for

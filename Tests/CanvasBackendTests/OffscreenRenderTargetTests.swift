@@ -219,6 +219,32 @@ func strokesAreDrawnInTheExactPaletteColour() {
     #expect(wrong == 0, "\(wrong) of \(covered) covered pixels are not the palette colour")
 }
 
+/// The axes reach the bitmap in the chrome's own colour. Rendered with no series at all, since two
+/// axis lines are a small fraction of a 1024×768 image — small enough that the cross-backend
+/// tolerance let them go missing without either equivalence check noticing.
+@Test
+func theAxesAreStrokedInTheChromeColour() {
+    var scratch: [Sample] = []
+    guard let pixels = OffscreenRenderTarget.render(
+        provider: eightCurves(), spec: LineChartSpec(series: []), window: window, yDomain: yDomain, scratch: &scratch
+    ) else {
+        Issue.record("could not create a bitmap context")
+        return
+    }
+    let expected = ChartChrome.light.axis.encodedSRGB
+    let blue = UInt8((expected.blue * 255).rounded())
+    let green = UInt8((expected.green * 255).rounded())
+    let red = UInt8((expected.red * 255).rounded())
+    var covered = 0
+    for index in stride(from: 0, to: pixels.count, by: 4)
+    where pixels[index] == blue && pixels[index + 1] == green && pixels[index + 2] == red {
+        covered += 1
+    }
+    // Comfortably above what either axis line alone would cover (the shorter, the bottom one, at
+    // roughly 960 pixels) and below both together (roughly 1 696): only their sum clears it.
+    #expect(covered > 1_200, "only \(covered) axis-coloured pixels; the axes may not have been drawn")
+}
+
 /// Antialiasing is pinned on, and a comparison run without it would judge two backends on hard
 /// edges — hiding exactly the sub-pixel differences the tolerance exists to absorb.
 @Test

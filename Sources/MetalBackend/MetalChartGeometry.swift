@@ -40,7 +40,6 @@ public struct MetalChartGeometry: Sendable, Equatable {
     /// - Complexity: O(*n*) in the frame's points.
     public static func build(
         _ frame: PreparedFrame,
-        chrome: ChartChrome,
         scale: Double,
         extendSegments: Bool = true
     ) -> MetalChartGeometry {
@@ -51,35 +50,28 @@ public struct MetalChartGeometry: Sendable, Equatable {
 
         // Chrome first: with blending off and no depth test, later draws overwrite earlier ones,
         // and the series must sit on top of the grid exactly as they do in the other backends.
-        var grid: [(SIMD2<Float>, SIMD2<Float>)] = []
-        for tick in frame.yTicks {
-            let y = PixelSnap.centre(
-                plot.maxY - tick.position * plot.height,
-                width: chrome.gridWidth,
-                scale: scale
-            ) * scale
-            grid.append((
-                SIMD2<Float>(Float(plot.minX * scale), Float(y)),
-                SIMD2<Float>(Float(plot.maxX * scale), Float(y))
-            ))
+        // `frame.chrome.lines` already sits pixel-snapped in points, so scale is the only thing
+        // this backend still applies — applying `PixelSnap` again here would snap twice.
+        var index = 0
+        while index < frame.chrome.lines.count {
+            let style = frame.chrome.lines[index]
+            var strokes: [(SIMD2<Float>, SIMD2<Float>)] = []
+            while index < frame.chrome.lines.count,
+                  frame.chrome.lines[index].colour == style.colour,
+                  frame.chrome.lines[index].width == style.width {
+                let line = frame.chrome.lines[index]
+                strokes.append((
+                    SIMD2<Float>(Float(line.x0 * scale), Float(line.y0 * scale)),
+                    SIMD2<Float>(Float(line.x1 * scale), Float(line.y1 * scale))
+                ))
+                index += 1
+            }
+            geometry.append(
+                MetalGeometryBuilder.build(strokes: strokes),
+                colour: style.colour,
+                width: style.width * scale
+            )
         }
-        geometry.append(
-            MetalGeometryBuilder.build(strokes: grid),
-            colour: chrome.grid,
-            width: chrome.gridWidth * scale
-        )
-
-        let left = PixelSnap.centre(plot.minX, width: chrome.axisWidth, scale: scale) * scale
-        let bottom = PixelSnap.centre(plot.maxY, width: chrome.axisWidth, scale: scale) * scale
-        let axes: [(SIMD2<Float>, SIMD2<Float>)] = [
-            (SIMD2<Float>(Float(left), Float(plot.minY * scale)), SIMD2<Float>(Float(left), Float(bottom))),
-            (SIMD2<Float>(Float(left), Float(bottom)), SIMD2<Float>(Float(plot.maxX * scale), Float(bottom))),
-        ]
-        geometry.append(
-            MetalGeometryBuilder.build(strokes: axes),
-            colour: chrome.axis,
-            width: chrome.axisWidth * scale
-        )
 
         for series in frame.series {
             geometry.append(

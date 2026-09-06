@@ -20,25 +20,18 @@ import simd
 /// body stays confined to the surface.
 public struct MetalChartView: View {
     private let geometry: MetalChartGeometry
-    private let ticks: (x: [PlottedTick], y: [PlottedTick])
-    private let plot: PlotRect
-    private let chrome: ChartChrome
+    private let layout: ChromeLayout
     private let rasterTime: RasterTimeRecorder?
     private let gpuTime: RasterTimeRecorder?
 
     public init(
         geometry: MetalChartGeometry,
-        plot: PlotRect,
-        xTicks: [PlottedTick],
-        yTicks: [PlottedTick],
-        chrome: ChartChrome = .light,
+        layout: ChromeLayout,
         rasterTime: RasterTimeRecorder? = nil,
         gpuTime: RasterTimeRecorder? = nil
     ) {
         self.geometry = geometry
-        self.plot = plot
-        self.ticks = (xTicks, yTicks)
-        self.chrome = chrome
+        self.layout = layout
         self.rasterTime = rasterTime
         self.gpuTime = gpuTime
     }
@@ -47,11 +40,11 @@ public struct MetalChartView: View {
         ZStack {
             MetalChartSurface(
                 geometry: geometry,
-                chrome: chrome,
+                background: layout.background,
                 rasterTime: rasterTime,
                 gpuTime: gpuTime
             )
-            MetalChartLabels(plot: plot, xTicks: ticks.x, yTicks: ticks.y, chrome: chrome)
+            MetalChartLabels(layout: layout)
         }
     }
 }
@@ -59,12 +52,12 @@ public struct MetalChartView: View {
 /// The drawing surface. Separated so that only this view reads the per-frame geometry.
 struct MetalChartSurface: UIViewRepresentable {
     let geometry: MetalChartGeometry
-    let chrome: ChartChrome
+    let background: PaletteColor
     let rasterTime: RasterTimeRecorder?
     let gpuTime: RasterTimeRecorder?
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(chrome: chrome, rasterTime: rasterTime, gpuTime: gpuTime)
+        Coordinator(background: background, rasterTime: rasterTime, gpuTime: gpuTime)
     }
 
     func makeUIView(context: Context) -> MTKView {
@@ -80,9 +73,9 @@ struct MetalChartSurface: UIViewRepresentable {
         // A clear colour is set per pass by the renderer; this only covers the moment before the
         // first frame exists.
         view.clearColor = MTLClearColor(
-            red: chrome.background.red,
-            green: chrome.background.green,
-            blue: chrome.background.blue,
+            red: background.red,
+            green: background.green,
+            blue: background.blue,
             alpha: 1
         )
         return view
@@ -90,7 +83,7 @@ struct MetalChartSurface: UIViewRepresentable {
 
     func updateUIView(_ view: MTKView, context: Context) {
         context.coordinator.geometry = geometry
-        context.coordinator.chrome = chrome
+        context.coordinator.background = background
         // The scene's tick, arriving as a state change. `draw()` is synchronous and this is the
         // only thing that calls it.
         view.draw()
@@ -105,7 +98,7 @@ struct MetalChartSurface: UIViewRepresentable {
 
         let device: MTLDevice?
         var geometry = MetalChartGeometry()
-        var chrome: ChartChrome
+        var background: PaletteColor
         /// Set when a frame could not be encoded, so a blank chart has a reason attached to it.
         private(set) var lastFailure: MetalRendererError?
         private let renderer: MetalLineRenderer?
@@ -113,8 +106,8 @@ struct MetalChartSurface: UIViewRepresentable {
         private let rasterTime: RasterTimeRecorder?
         private let gpuTime: RasterTimeRecorder?
 
-        init(chrome: ChartChrome, rasterTime: RasterTimeRecorder?, gpuTime: RasterTimeRecorder?) {
-            self.chrome = chrome
+        init(background: PaletteColor, rasterTime: RasterTimeRecorder?, gpuTime: RasterTimeRecorder?) {
+            self.background = background
             self.rasterTime = rasterTime
             self.gpuTime = gpuTime
             let device = MTLCreateSystemDefaultDevice()
@@ -150,7 +143,7 @@ struct MetalChartSurface: UIViewRepresentable {
                         Float(view.drawableSize.width),
                         Float(view.drawableSize.height)
                     ),
-                    clearColour: chrome.background,
+                    clearColour: background,
                     descriptor: descriptor,
                     in: commandBuffer
                 )
@@ -179,32 +172,18 @@ struct MetalChartSurface: UIViewRepresentable {
     }
 }
 
-/// Axis labels, drawn by SwiftUI over the Metal surface.
+/// Axis labels, drawn by SwiftUI over the Metal surface, from the same layout every other backend
+/// strokes — this view places no tick itself.
 struct MetalChartLabels: View {
-    let plot: PlotRect
-    let xTicks: [PlottedTick]
-    let yTicks: [PlottedTick]
-    let chrome: ChartChrome
+    let layout: ChromeLayout
 
     private static let labelFont = Font.system(size: 9, design: .monospaced)
 
     var body: some View {
         Canvas(opaque: false, rendersAsynchronously: false) { context, _ in
-            for tick in yTicks {
-                let y = plot.maxY - tick.position * plot.height
-                context.draw(
-                    context.resolve(label(tick.label)),
-                    at: CGPoint(x: plot.minX - 6, y: y),
-                    anchor: .trailing
-                )
-            }
-            for tick in xTicks {
-                let x = plot.minX + tick.position * plot.width
-                context.draw(
-                    context.resolve(label(tick.label)),
-                    at: CGPoint(x: x, y: plot.maxY + 10),
-                    anchor: .center
-                )
+            for entry in layout.labels {
+                let anchor: UnitPoint = entry.anchor == .trailing ? .trailing : .center
+                context.draw(context.resolve(label(entry.text)), at: CGPoint(x: entry.x, y: entry.y), anchor: anchor)
             }
         }
         .allowsHitTesting(false)
@@ -214,7 +193,7 @@ struct MetalChartLabels: View {
         Text(text)
             .font(Self.labelFont)
             .foregroundStyle(
-                Color(.sRGBLinear, red: chrome.label.red, green: chrome.label.green, blue: chrome.label.blue)
+                Color(.sRGBLinear, red: layout.labelColour.red, green: layout.labelColour.green, blue: layout.labelColour.blue)
             )
     }
 }

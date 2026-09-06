@@ -84,8 +84,9 @@ func batchesIndexIntoOneSharedBuffer() {
         ),
     ]
     frame.yTicks = [PlottedTick(position: 0.5, label: "0")]
+    frame.chrome = ChromeLayout.build(plot: plot, xTicks: [], yTicks: frame.yTicks, chrome: .light, scale: 1)
 
-    let geometry = MetalChartGeometry.build(frame, chrome: .light, scale: 1)
+    let geometry = MetalChartGeometry.build(frame, scale: 1)
     // Grid, axes, and one batch per series.
     #expect(geometry.batches.count == 4)
     // Every segment index must address the shared point buffer, not its own slice.

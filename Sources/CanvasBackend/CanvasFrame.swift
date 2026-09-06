@@ -19,6 +19,8 @@ public struct CanvasFrame {
     public var plotRect: CGRect
     /// Stroke width in points, taken from the spec.
     public var lineWidth: Double
+    /// The grid, axes and labels, laid out once for every backend to stroke.
+    public var chrome: ChromeLayout
     /// Series the renderer refused to draw, with the reason.
     public var failures: [SeriesFailure]
     /// Samples handed to the renderer after downsampling.
@@ -37,6 +39,7 @@ public struct CanvasFrame {
         self.yTicks = []
         self.plotRect = .zero
         self.lineWidth = 1
+        self.chrome = .empty
         self.failures = []
         self.pointsSubmitted = 0
         self.pointsDrawn = 0

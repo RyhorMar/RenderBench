@@ -269,6 +269,42 @@ func identifierIsPinned() {
     #expect(CoreAnimationBackend.identifier == "core-animation")
 }
 
+/// Both axis lines reach the render, in the chrome's own colour — not only the grid's. Rendered
+/// with no series at all: two one-point-wide axis lines are a small fraction of a 1024×768 image,
+/// small enough that the cross-backend equivalence tests let one of them go missing unnoticed.
+@Test
+func bothAxisLinesAreStrokedInTheChromeColour() {
+    var scratch: [Sample] = []
+    let frame = FramePreparation.prepare(
+        provider: eightCurves(),
+        spec: LineChartSpec(series: []),
+        window: window,
+        yDomain: yDomain,
+        size: size,
+        chrome: .forScheme(dark: false),
+        scale: 1,
+        dark: false,
+        measuring: ApproximateTextWidth(),
+        scratch: &scratch
+    )
+    guard let pixels = CoreAnimationRenderTarget.render(frame) else {
+        Issue.record("could not create a bitmap context")
+        return
+    }
+    let expected = ChartChrome.light.axis.encodedSRGB
+    let blue = UInt8((expected.blue * 255).rounded())
+    let green = UInt8((expected.green * 255).rounded())
+    let red = UInt8((expected.red * 255).rounded())
+    var covered = 0
+    for index in stride(from: 0, to: pixels.count, by: 4)
+    where pixels[index] == blue && pixels[index + 1] == green && pixels[index + 2] == red {
+        covered += 1
+    }
+    // Comfortably above what either axis line alone would cover (the shorter, the bottom one, at
+    // roughly 960 pixels) and below both together (roughly 1 696): only their sum clears it.
+    #expect(covered > 1_200, "only \(covered) axis-coloured pixels; an axis line may be missing")
+}
+
 /// A hand-allocated CALayer starts at scale 1 and `addSublayer` does not propagate the value, so
 /// without explicit propagation every shape rasterises at a third of a 3x device's resolution —
 /// and the render server does about a ninth of the work, which would hand this backend a timing
@@ -313,12 +349,10 @@ func everySublayerCoversTheChart() {
 @Test
 func aPresentationCopyCarriesPropertiesAndNoSublayers() {
     let original = CoreAnimationChartLayer()
-    original.chrome = .dark
     original.renderScale = 2
     original.update(with: prepared(seriesCount: 3))
 
     let copy = CoreAnimationChartLayer(layer: original)
-    #expect(copy.chrome == original.chrome)
     #expect(copy.renderScale == 2)
     #expect((copy.sublayers ?? []).isEmpty, "the copy allocated \((copy.sublayers ?? []).count) sublayers")
 }
@@ -347,12 +381,24 @@ func theBackgroundIsSetBeforeAnyFrameArrives() {
     let layer = CoreAnimationChartLayer()
     #expect(layer.backgroundColor != nil)
 
-    layer.chrome = .dark
-    #expect(layer.backgroundColor != nil)
-    #expect(layer.backgroundFill == ChartChrome.dark.background)
+    var scratch: [Sample] = []
+    let dark = FramePreparation.prepare(
+        provider: eightCurves(),
+        spec: LineChartSpec(series: [0]),
+        window: window,
+        yDomain: yDomain,
+        size: size,
+        chrome: .forScheme(dark: true),
+        scale: 1,
+        dark: true,
+        measuring: ApproximateTextWidth(),
+        scratch: &scratch
+    )
+    layer.frame = CGRect(x: 0, y: 0, width: size.width, height: size.height)
+    layer.update(with: dark)
+    #expect(layer.backgroundColor == ChartChrome.dark.background.cgColor)
 
     // A frame too small to draw must not clear it.
-    var scratch: [Sample] = []
     let tiny = FramePreparation.prepare(
         provider: eightCurves(),
         spec: LineChartSpec(series: [0]),
@@ -366,7 +412,7 @@ func theBackgroundIsSetBeforeAnyFrameArrives() {
         scratch: &scratch
     )
     layer.update(with: tiny)
-    #expect(layer.backgroundColor != nil)
+    #expect(layer.backgroundColor == ChartChrome.dark.background.cgColor)
 }
 
 /// An unchanged appearance is not rewritten. Every animatable write marks the shape dirty and

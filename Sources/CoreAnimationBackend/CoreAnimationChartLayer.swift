@@ -57,16 +57,6 @@ public final class CoreAnimationChartLayer: CALayer {
     /// short-circuit that would skip the work can never fire.
     private var appliedStyle: [ObjectIdentifier: (colour: PaletteColor, width: Double)] = [:]
 
-    /// Colours and weights for everything that is not a series, shared with the Canvas backend
-    /// and with the offscreen reference. Three independent definitions of these disagreed before.
-    public var chrome: ChartChrome = .light {
-        didSet { applyChrome() }
-    }
-
-    /// Background fill. Kept under its own name because it is a layer property the compositor
-    /// reads, but it is the chrome's and not a separate setting.
-    public var backgroundFill: PaletteColor { chrome.background }
-
     /// Device pixels per point. **Must be set by the host** from the screen it draws on.
     ///
     /// A hand-allocated `CALayer` starts at 1.0 and `addSublayer` does not propagate the value, so
@@ -91,7 +81,6 @@ public final class CoreAnimationChartLayer: CALayer {
     public override init(layer: Any) {
         super.init(layer: layer)
         if let source = layer as? CoreAnimationChartLayer {
-            chrome = source.chrome
             renderScale = source.renderScale
         }
     }
@@ -104,21 +93,16 @@ public final class CoreAnimationChartLayer: CALayer {
     private func commonSetup() {
         gridLayer.fillColor = nil
         axisLayer.fillColor = nil
-        applyChrome()
+        // No frame has arrived yet to say otherwise, and a background left nil composites as
+        // transparent — a mismatch against every reference image attributable to nothing about
+        // rendering.
+        backgroundColor = ChromeLayout.empty.background.cgColor
         for layer in [gridLayer, axisLayer] {
             suppressActions(on: layer)
             addSublayer(layer)
         }
         suppressActions(on: self)
         applyScale()
-    }
-
-    private func applyChrome() {
-        backgroundColor = chrome.background.cgColor
-        gridLayer.lineWidth = CGFloat(chrome.gridWidth)
-        gridLayer.strokeColor = chrome.grid.cgColor
-        axisLayer.lineWidth = CGFloat(chrome.axisWidth)
-        axisLayer.strokeColor = chrome.axis.cgColor
     }
 
     /// Turns off implicit animation as a property of the layer, not of one call site.
@@ -180,19 +164,20 @@ public final class CoreAnimationChartLayer: CALayer {
             CATransaction.setDisableActions(true)
             defer { CATransaction.commit() }
 
-            let grid = CGMutablePath()
-            for tick in prepared.yTicks {
-                let y = plot.maxY - tick.position * plot.height
-                grid.move(to: CGPoint(x: plot.minX, y: y))
-                grid.addLine(to: CGPoint(x: plot.maxX, y: y))
-            }
-            gridLayer.path = grid
+            backgroundColor = prepared.chrome.background.cgColor
 
-            let axes = CGMutablePath()
-            axes.move(to: CGPoint(x: plot.minX, y: plot.minY))
-            axes.addLine(to: CGPoint(x: plot.minX, y: plot.maxY))
-            axes.addLine(to: CGPoint(x: plot.maxX, y: plot.maxY))
-            axisLayer.path = axes
+            let gridLines = prepared.chrome.lines.dropLast(2)
+            let axisLines = prepared.chrome.lines.suffix(2)
+            gridLayer.path = chromePath(gridLines)
+            axisLayer.path = chromePath(axisLines)
+            if let style = gridLines.first {
+                gridLayer.lineWidth = CGFloat(style.width)
+                gridLayer.strokeColor = style.colour.cgColor
+            }
+            if let style = axisLines.first {
+                axisLayer.lineWidth = CGFloat(style.width)
+                axisLayer.strokeColor = style.colour.cgColor
+            }
 
             growSeriesLayers(to: prepared.series.count)
             for (position, series) in prepared.series.enumerated() {
@@ -271,6 +256,25 @@ public final class CoreAnimationChartLayer: CALayer {
             addSublayer(layer)
             seriesLayers.append(layer)
         }
+    }
+
+    /// Builds one path from a run of chrome lines, chaining rather than moving wherever one line
+    /// continues the last.
+    ///
+    /// The grid's lines never do; the two axis lines always do — `ChromeLayout` documents that
+    /// order — and chaining is what turns their shared corner into a joined stroke instead of two
+    /// butt-capped ends.
+    private func chromePath(_ lines: some Sequence<ChromeLine>) -> CGMutablePath {
+        let path = CGMutablePath()
+        var previousEnd: CGPoint?
+        for line in lines {
+            let start = CGPoint(x: line.x0, y: line.y0)
+            if previousEnd != start { path.move(to: start) }
+            let end = CGPoint(x: line.x1, y: line.y1)
+            path.addLine(to: end)
+            previousEnd = end
+        }
+        return path
     }
 
 }
