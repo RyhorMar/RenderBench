@@ -43,6 +43,7 @@ let package = Package(
         .library(name: "MetalBackend", targets: ["MetalBackend"]),
         .library(name: "SwiftChartsBackend", targets: ["SwiftChartsBackend"]),
         .library(name: "ShapePathBackend", targets: ["ShapePathBackend"]),
+        .library(name: "CoreImageBackend", targets: ["CoreImageBackend"]),
     ],
     targets: [
         // MARK: Layers
@@ -149,6 +150,17 @@ let package = Package(
             swiftSettings: strictMainActor
         ),
 
+        // Sixth of the nine, and the first that does not construct the line at all: `encode(_:)`
+        // rasterises with `CoreGraphicsReference`, the same CPU rasteriser every Core-Graphics
+        // backend is compared against, and hands the result to a `CIColorControls` filter running
+        // on the GPU. Main-actor by default like `CanvasBackend`, `SwiftChartsBackend` and
+        // `ShapePathBackend`, for the same reason — `@Observable` state a SwiftUI view reads.
+        .target(
+            name: "CoreImageBackend",
+            dependencies: ["BenchCore", "BenchRuntime", "BenchHost"],
+            swiftSettings: strictMainActor
+        ),
+
         // MARK: Tooling
 
         // The dependency rule is machine-checked because nothing else enforces it: SwiftPM does
@@ -217,6 +229,11 @@ let package = Package(
         .testTarget(
             name: "ShapePathBackendTests",
             dependencies: ["ShapePathBackend", "BenchHost", "BenchTestSupport"],
+            swiftSettings: strictMainActor
+        ),
+        .testTarget(
+            name: "CoreImageBackendTests",
+            dependencies: ["CoreImageBackend", "BenchHost", "BenchScales", "BenchTestSupport"],
             swiftSettings: strictMainActor
         ),
     ]

@@ -310,6 +310,38 @@
         "BenchHost",
         "ShapePathBackend"
       ]
+    },
+    "Sources/CoreImageBackend": {
+      "system": [
+        "Foundation",
+        "SwiftUI",
+        "CoreImage",
+        "Metal",
+        "MetalKit",
+        "CoreGraphics"
+      ],
+      "local": [
+        "BenchCore",
+        "BenchRuntime",
+        "BenchHost"
+      ]
+    },
+    "Tests/CoreImageBackendTests": {
+      "system": [
+        "Foundation",
+        "Testing",
+        "Metal",
+        "CoreImage",
+        "CoreGraphics"
+      ],
+      "local": [
+        "BenchCore",
+        "BenchRuntime",
+        "BenchScales",
+        "BenchTestSupport",
+        "BenchHost",
+        "CoreImageBackend"
+      ]
     }
   }
 }

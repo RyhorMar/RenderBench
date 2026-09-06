@@ -19,6 +19,7 @@ what each one costs and where each one lies.
 | [Equivalence](equivalence.md) | per-channel difference, PSNR, offscreen reference | no |
 | [Declarative chart](declarative-chart.md) | Swift Charts `LineMark`, run-splitting at breaks | no |
 | [Shape and Path](shape-path.md) | retained SwiftUI `Shape` per series, index-marked breaks | no |
+| [Core Image](core-image.md) | CPU raster delivered through a `CIColorControls` GPU filter | no |
 
 ## What each page contains
 

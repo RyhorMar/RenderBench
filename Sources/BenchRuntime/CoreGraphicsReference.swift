@@ -27,6 +27,29 @@ public enum CoreGraphicsReference {
     /// - Returns: `ComparisonImage.byteCount(scale:)` bytes, or `nil` when a context could not be
     ///   created.
     public static func render(_ frame: PreparedFrame, scale: Double = 1) -> [UInt8]? {
+        makeCanvas(frame, scale: scale)?.pixels()
+    }
+
+    /// Renders a frame exactly as ``render(_:scale:)`` does, but returns the `CGImage` snapshot of
+    /// the same bitmap context instead of copying its bytes out.
+    ///
+    /// Exists for a backend — Core Image so far — whose own pipeline starts from a `CGImage`
+    /// rather than from raw bytes, and which must be provably drawing the same thing this
+    /// reference draws rather than merely something similar. `CGContext.makeImage()` snapshots the
+    /// context's own storage with no intervening copy or re-encoding, so the image this returns and
+    /// the bytes ``render(_:scale:)`` returns for the same frame are the same pixels by
+    /// construction, not by two rasterisers agreeing.
+    ///
+    /// - Returns: `nil` under the same condition as ``render(_:scale:)``.
+    public static func renderCGImage(_ frame: PreparedFrame, scale: Double = 1) -> CGImage? {
+        guard let canvas = makeCanvas(frame, scale: scale) else { return nil }
+        return canvas.context.makeImage()
+    }
+
+    /// Draws a frame into a freshly allocated ``BitmapCanvas`` and returns it, still holding the
+    /// drawn context. Shared by ``render(_:scale:)`` and ``renderCGImage(_:scale:)`` so the two
+    /// can never draw anything differently from one another.
+    private static func makeCanvas(_ frame: PreparedFrame, scale: Double) -> BitmapCanvas? {
         let pixelWidth = Int((Double(ComparisonImage.width) * scale).rounded())
         let pixelHeight = Int((Double(ComparisonImage.height) * scale).rounded())
         guard let canvas = BitmapCanvas(width: pixelWidth, height: pixelHeight) else { return nil }
@@ -60,7 +83,7 @@ public enum CoreGraphicsReference {
         // Labels are deliberately not drawn. Text rasterisation depends on the installed font and
         // on the text engine's version, so including it would make a stored reference invalid on a
         // machine that draws the same chart correctly. Equivalence is about the data path.
-        return canvas.pixels()
+        return canvas
     }
 
     /// Builds one series' stroke path from its points, already projected into `0...1` by
