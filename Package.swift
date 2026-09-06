@@ -46,6 +46,7 @@ let package = Package(
         .library(name: "CoreImageBackend", targets: ["CoreImageBackend"]),
         .library(name: "SceneKitBackend", targets: ["SceneKitBackend"]),
         .library(name: "ShaderBackend", targets: ["ShaderBackend"]),
+        .library(name: "MetalComputeBackend", targets: ["MetalComputeBackend"]),
     ],
     targets: [
         // MARK: Layers
@@ -189,6 +190,19 @@ let package = Package(
             swiftSettings: strictMainActor
         ),
 
+        // Ninth and last, and the only one whose method is the reduction itself rather than the
+        // drawing of an already-reduced frame: the scene hands it every windowed point, at
+        // `DownsamplePolicy.none`, and `encode(_:)` runs MinMax on the GPU before the same kind of
+        // instanced-quad line pass `MetalBackend` uses. It does not depend on `MetalBackend` — no
+        // backend in this package depends on another, a rule earlier cards kept by moving
+        // `ApproximateTextWidth` out of `CanvasBackend` rather than reaching for it from elsewhere
+        // — so the small amount of line-drawing code the two share is duplicated, not imported.
+        .target(
+            name: "MetalComputeBackend",
+            dependencies: ["BenchCore", "BenchRuntime", "BenchHost"],
+            swiftSettings: strictMainActor
+        ),
+
         // MARK: Tooling
 
         // The dependency rule is machine-checked because nothing else enforces it: SwiftPM does
@@ -272,6 +286,11 @@ let package = Package(
         .testTarget(
             name: "ShaderBackendTests",
             dependencies: ["ShaderBackend", "BenchHost", "BenchScales", "BenchTestSupport"],
+            swiftSettings: strictMainActor
+        ),
+        .testTarget(
+            name: "MetalComputeBackendTests",
+            dependencies: ["MetalComputeBackend", "BenchHost", "BenchScales", "BenchTestSupport"],
             swiftSettings: strictMainActor
         ),
     ]

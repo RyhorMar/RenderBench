@@ -1,3 +1,4 @@
+import BenchDownsampling
 import BenchHost
 import BenchRuntime
 import SwiftUI
@@ -17,6 +18,7 @@ struct HUDView: View {
     var body: some View {
         VStack(alignment: .trailing, spacing: 2) {
             row("fps", String(format: "%.0f", scene.observedHz))
+            row("policy", policyLabel)
             // Two columns, not one. "prep" is preparation plus geometry building; "draw" is the
             // rasterisation the backend could time. Adding them into a single figure and calling
             // it the frame cost is what this overlay did until the draw pass was measured at all.
@@ -53,6 +55,19 @@ struct HUDView: View {
     private func gpuValue(_ path: KeyPath<FrameStatistics, UInt64>) -> String {
         guard descriptor.reportsGPUTime, let gpu = scene.gpuStatistics else { return "—" }
         return milliseconds(gpu[keyPath: path])
+    }
+
+    /// `scene.policy` names what the picker selected, not what actually reached the backend: for
+    /// the one backend that reduces on the GPU, `ChartScene.advance(_:)` overrides it to `.none`
+    /// before `FramePreparation.prepare` ever sees it, so showing `scene.policy` unchanged here
+    /// would claim a CPU reduction this frame never ran.
+    private var policyLabel: String {
+        guard !descriptor.reducesOnGPU else { return "MinMax (GPU)" }
+        switch scene.policy {
+        case .minMax: return "MinMax"
+        case .lttb: return "LTTB"
+        case .none: return "None"
+        }
     }
 
     private func row(_ name: String, _ value: String) -> some View {

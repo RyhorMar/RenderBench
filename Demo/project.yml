@@ -67,6 +67,8 @@ targets:
         product: SceneKitBackend
       - package: RenderBench
         product: ShaderBackend
+      - package: RenderBench
+        product: MetalComputeBackend
 
   RenderBenchDemoTests:
     type: bundle.unit-test

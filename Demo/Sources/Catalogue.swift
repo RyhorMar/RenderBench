@@ -3,6 +3,7 @@ import CanvasBackend
 import CoreAnimationBackend
 import CoreImageBackend
 import MetalBackend
+import MetalComputeBackend
 import SceneKitBackend
 import ShaderBackend
 import ShapePathBackend
@@ -26,5 +27,6 @@ enum Catalogue {
         RendererEntry(CoreImageRenderer.self),
         RendererEntry(SceneKitRenderer.self),
         RendererEntry(ShaderRenderer.self),
+        RendererEntry(MetalComputeRenderer.self),
     ]
 }

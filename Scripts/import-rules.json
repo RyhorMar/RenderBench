@@ -401,6 +401,37 @@
         "BenchHost",
         "ShaderBackend"
       ]
+    },
+    "Sources/MetalComputeBackend": {
+      "system": [
+        "Foundation",
+        "Metal",
+        "MetalKit",
+        "SwiftUI",
+        "simd"
+      ],
+      "local": [
+        "BenchCore",
+        "BenchRuntime",
+        "BenchHost"
+      ]
+    },
+    "Tests/MetalComputeBackendTests": {
+      "system": [
+        "Foundation",
+        "Metal",
+        "Testing",
+        "SwiftUI",
+        "simd"
+      ],
+      "local": [
+        "BenchCore",
+        "BenchRuntime",
+        "BenchScales",
+        "BenchTestSupport",
+        "BenchHost",
+        "MetalComputeBackend"
+      ]
     }
   }
 }

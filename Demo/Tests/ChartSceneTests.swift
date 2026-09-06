@@ -62,7 +62,7 @@ func switchingTheRendererTearsDownTheOutgoingOne() {
 func theArgumentListNamesEveryCatalogueEntry() {
     let literalIDs: Set<String> = [
         "canvas", "core-animation", "metal", "swift-charts", "shape-path", "core-image",
-        "scenekit", "shader",
+        "scenekit", "shader", "metal-compute",
     ]
     #expect(literalIDs == Set(Catalogue.renderers.map(\.id)))
 }

@@ -22,6 +22,7 @@ what each one costs and where each one lies.
 | [Core Image](core-image.md) | CPU raster delivered through a `CIColorControls` GPU filter | no |
 | [SceneKit](scenekit.md) | 2D chart as `.line`-primitive geometry in a 3D scene, orthographic camera | no |
 | [Shader](shader.md) | analytic segment-distance coverage in a SwiftUI `colorEffect` fragment program | no |
+| [GPU compute reduction](gpu-compute-reduction.md) | per-column MinMax on the GPU, bucketed by normalised x after projection | no |
 
 ## What each page contains
 

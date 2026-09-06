@@ -262,9 +262,13 @@ final class ChartScene {
         produce(upTo: plan.samplesDue)
         let snapshot = plan.snapshot
 
+        // The one backend whose method is the reduction itself must receive every windowed point,
+        // unreduced: `FramePreparation.prepare` honours `.none` by skipping reduction entirely,
+        // so `encode(_:)` gets the whole window to reduce on the GPU rather than a picture
+        // `BenchDownsampling` has already decided.
         let spec = LineChartSpec(
             series: Array(streams.indices),
-            policy: policy,
+            policy: type(of: renderer).descriptor.reducesOnGPU ? .none : policy,
             lineWidth: scenario == .carrier ? 1.0 : 1.5
         )
         let prepared = FramePreparation.prepare(
