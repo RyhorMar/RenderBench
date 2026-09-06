@@ -204,12 +204,15 @@ final class ChartScene {
             scratch: &scratch
         )
 
+        // `rasterTime.take()` now carries the revision of the `encode()` call it timed, alongside
+        // the nanoseconds; only the nanoseconds go into `FrameMetrics` today; see the report for
+        // whether that revision is enough to tell this reading apart from an older frame's.
         metrics.record(
             FrameMetrics(
                 frameID: snapshot.frameID,
                 cpuPrepareNs: built.prepareNs,
                 cpuEncodeNs: built.encodeNs,
-                rasterNs: rasterTime.take(),
+                rasterNs: rasterTime.take()?.nanoseconds,
                 targetTimestamp: tick.targetTimestamp,
                 pointsSubmitted: built.pointsSubmitted,
                 pointsDrawn: built.pointsDrawn,
