@@ -166,7 +166,7 @@ let package = Package(
         ),
         .testTarget(
             name: "MetalBackendTests",
-            dependencies: ["MetalBackend", "CanvasBackend", "BenchTestSupport"],
+            dependencies: ["MetalBackend", "BenchScales", "BenchTestSupport"],
             swiftSettings: strictMainActor
         ),
         .testTarget(

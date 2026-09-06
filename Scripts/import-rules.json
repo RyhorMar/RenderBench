@@ -219,8 +219,8 @@
       "local": [
         "BenchCore",
         "BenchRuntime",
+        "BenchScales",
         "BenchTestSupport",
-        "CanvasBackend",
         "MetalBackend"
       ]
     }

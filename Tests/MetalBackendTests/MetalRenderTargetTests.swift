@@ -1,6 +1,6 @@
 import BenchCore
 import BenchRuntime
-import CanvasBackend
+import BenchScales
 import Foundation
 import Metal
 import Testing

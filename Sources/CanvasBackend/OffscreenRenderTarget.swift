@@ -1,5 +1,6 @@
 import BenchCore
 import BenchRuntime
+import BenchScales
 
 /// The pinned size and format of every comparison render, and the one way to produce one from a
 /// provider without going through another backend.
