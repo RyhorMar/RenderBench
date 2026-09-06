@@ -28,11 +28,21 @@ is the `ChartRenderer` conformer that ties the three together.
   break point's coordinates are always the placeholder `(0, 0)` and are never real data.
 - A break ends one run and starts the next, exactly like every other backend's treatment of a
   gap — no bucket this backend builds ever spans one.
-- Per run, `columns = max(1, Int(runWidthNormalised * plot.width))`, where `runWidthNormalised` is
-  that run's own `(maxX - minX)` among its own points. This mirrors `FramePreparation`'s own
-  `target = max(2, Int(plot.width))` sizing for the whole-frame case, applied per run instead,
-  since this backend never sees a whole frame's carrier range — only what already reached it as
-  normalised x.
+- Per run, `columns = max(1, Int(runWidthNormalised * plot.width) / 2)`, where `runWidthNormalised`
+  is that run's own `(maxX - minX)` among its own points and `Int(runWidthNormalised * plot.width)`
+  is a **point budget** of the same kind `FramePreparation`'s own `target = max(2, Int(plot.width))`
+  hands the CPU path for the whole frame, applied here per run against that run's own share of the
+  plot's width instead, since this backend never sees a whole frame's carrier range — only what
+  already reached it as normalised x. The budget is halved into a bucket count for the same reason
+  `Sources/BenchDownsampling/Downsample.swift`'s `appendMinMax` halves its own budget into
+  `bucketCount = max(1, budget / 2)`: each bucket emits up to two points, min and max. An earlier
+  version of this formula used the pixel-width budget as the bucket count directly — a design
+  mistake in the card that specified it, not a coding slip in either implementation — and emitted
+  roughly twice the CPU path's point density for the same nominal budget, undetected by the
+  equivalence check below because that check cannot see extra ink where the reference had none;
+  see `Tests/MetalComputeBackendTests/MetalComputeRenderTargetTests.swift`'s
+  `gpuReductionPointDensityStaysWithinOneAndAHalfTimesTheCPUBudget` for the count-based check added
+  alongside it for exactly that reason.
 - Each bucket emits the point with the minimum y and the point with the maximum y it contains, in
   carrier order — whichever occurred first in the run, not always minimum-then-maximum, since the
   wrong order draws the line backwards inside the bucket. Both `<` and `>` are strict, so a tie
@@ -82,18 +92,45 @@ multi-segment data, and the difference is deliberate rather than an oversight:
 On the project's own reference fixture (`eightCurves()`: one contiguous run per series, regularly
 sampled, no gaps) these deviations do not appear — one run, one budget, evenly spaced points, an
 affine projection — so the two are expected to converge closely there. Measured against
-`CoreGraphicsReference.render(_:)` on that fixture, CPU-reduced at `policy: .minMax`: **0 of 8188
-solid pixels disagree**, 132 mismatches away from edges — matching `Docs/methods/gpu-lines.md`'s
-own numbers for `MetalBackend` on the identical fixture, since both draw through the same line
-pass and both were handed the same points to draw once the two reductions had each run. This is
-not a general equivalence guarantee: it is what one fixture chosen to look nothing like an
-adversarial case for either algorithm happens to show.
+`CoreGraphicsReference.render(_:)` on that fixture, CPU-reduced at `policy: .minMax`, after the
+bucket-count fix documented above: **0 of 8188 solid pixels disagree**, 133 mismatches away from
+edges — matching the `MetalBackend` row `Docs/methods/equivalence.md`'s own table reports for the
+identical fixture, since both draw through the same instanced-quad line pass and both were handed
+the same points to draw once their own reduction had run. (An earlier measurement of this section,
+taken before the bucket-count fix and against the doubled point count that bug produced, reported
+132 here instead of 133 — the pixel-equivalence check could not tell the difference, which is
+exactly why the density check below exists alongside it.) This is not a general equivalence
+guarantee: it is what one fixture chosen to look nothing like an adversarial case for either
+algorithm happens to show.
+
+Point density, not just pixel agreement, is now checked on this fixture too: the CPU path emits
+7680 points (8 series × 960) and this backend's GPU path emits 7664 (8 series × 958) — a ratio of
+0.998, close to but not exactly matching the CPU path, exactly as the bucketing-space deviations
+above predict. `gpuReductionPointDensityStaysWithinOneAndAHalfTimesTheCPUBudget` in
+`Tests/MetalComputeBackendTests/MetalComputeRenderTargetTests.swift` asserts this ratio stays
+within `1.5`× either direction, specifically because the pixel-equivalence check above cannot
+detect a regression in density: doubling the bucket count draws twice the ink without ever leaving
+a reference-certain pixel unfilled.
 
 ## What it costs and where it lies
 
-The library — the reduction kernel and the line pass together, one source string, compiled once
-per renderer — is paid at construction, not per frame, for the same reason `MetalBackend`'s shader
-is. The reduction itself costs a GPU dispatch per run and, unavoidably, a wait: `pointsDrawn` is
+The library — the reduction kernel and the line pass together, one source string — is compiled
+exactly once per renderer, in `MetalComputeRenderer.init` (and, for the off-screen comparison
+target, in `MetalComputeRenderTarget.init`), by `MetalComputeCompiledLibrary`, and the resulting
+`MTLLibrary` is handed to both `MetalComputeReducer` and `MetalComputeLineRenderer` rather than
+each compiling its own copy. An earlier version of both types called `MTLDevice.makeLibrary(source:)`
+independently, which paid the ~48 ms compile this method shares with `MetalBackend` (per that
+method's own page) twice and made this paragraph's "compiled once" claim false; the fix is
+compiling once, above both consumers, not caching or otherwise working around a second compile.
+
+The command queue `MetalComputeReducer.reduce(runsPerSeries:plotWidth:)` submits to is built once,
+in `MetalComputeReducer.init`, and reused by every call — matching every other Metal object
+construction in this backend and package (`MetalComputeRenderTarget.init`, both
+`MetalComputeChartView.swift` `Coordinator.init`s). An earlier version called
+`device.makeCommandQueue()` inside `reduce` itself, once per frame: a real, previously undisclosed
+per-frame cost in a project whose premise is honest per-frame accounting.
+
+The reduction itself costs a GPU dispatch per run and, unavoidably, a wait: `pointsDrawn` is
 not known until the result is back, so `MetalComputeReducer.reduce(runsPerSeries:plotWidth:)`
 calls `commandBuffer.waitUntilCompleted()` before returning, and that wait sits inside `encode(_:)`'s
 own timed section. No other backend in this project pays a GPU-round-trip cost in `encode(_:)`
@@ -116,7 +153,10 @@ here first.
 - `Tests/MetalComputeBackendTests/MetalComputeRenderTargetTests.swift` — the reduced-and-drawn
   chart passes the same structural comparison against the Core Graphics reference every other
   backend is judged against; a shifted render and a render with a bridged gap are both rejected;
-  `RunSplitter` ends a run at every break.
+  `RunSplitter` ends a run at every break; `pointsDrawn` after GPU reduction stays within `1.5`× the
+  CPU path's own point count on the reference fixture — the density check the pixel comparison
+  cannot be, added because that comparison passed straight through the bucket-count bug this card
+  found and fixed.
 - `Tests/MetalComputeBackendTests/MetalComputeRendererTests.swift` — `encodedRevision` advances
   once per `encode(_:)` call and stops advancing once torn down; `pointsDrawn` and `drawCalls` are
   known zeros after teardown rather than a fabricated stand-in for `nil`, and `nil` on a host with

@@ -55,42 +55,37 @@ public enum RunSplitter {
 
 /// How many buckets one run reduces to.
 ///
-/// Mirrors `FramePreparation`'s own `target = max(2, Int(plot.width))` — one target point per
-/// horizontal point of the plot — applied per run against that run's own share of the plot's
-/// width rather than once for the whole frame, since this backend never sees the whole frame's
-/// carrier range, only what already reached it as normalised x.
+/// `Int(runWidthNormalised * plotWidth)` is a **point budget**, the same kind `FramePreparation`'s
+/// own `target = max(2, Int(plot.width))` hands the CPU path for a whole frame — applied here per
+/// run against that run's own share of the plot's width instead, since this backend never sees the
+/// whole frame's carrier range, only what already reached it as normalised x. A budget is not a
+/// bucket count: `Sources/BenchDownsampling/Downsample.swift`'s `appendMinMax` halves its own
+/// budget into `bucketCount = max(1, budget / 2)` because each bucket emits up to two points, min
+/// and max, so the width in pixels must be halved to land on the same nominal density. An earlier
+/// version of this function used the raw pixel-width budget as the bucket count directly and
+/// emitted roughly twice the CPU path's point density for the same nominal budget — a design
+/// mistake in the formula itself, not a coding slip, corrected by the halving below.
 public enum RunColumns {
     public static func columns(runWidthNormalised: Double, plotWidth: Double) -> Int {
-        max(1, Int(runWidthNormalised * plotWidth))
+        max(1, Int(runWidthNormalised * plotWidth) / 2)
     }
 }
 
 /// Owns the device and the compute pipeline that reduces runs of points to their per-bucket
 /// extrema, on the GPU.
 ///
-/// Built once, like `MetalLineRenderer`'s pipeline: the library compile is paid here, at
-/// construction, and reported through ``libraryCompileNanoseconds`` rather than folded into a
-/// frame.
+/// Built once, like `MetalLineRenderer`'s pipeline: the pipeline state is derived here, at
+/// construction, from a library the caller compiled exactly once and shares with
+/// ``MetalComputeLineRenderer`` too — see ``MetalComputeCompiledLibrary``. The command queue is
+/// built here as well and reused by every ``reduce(runsPerSeries:plotWidth:)`` call; an earlier
+/// version made a fresh queue inside `reduce` itself, once per frame.
 public final class MetalComputeReducer {
     public let device: MTLDevice
-    public let libraryCompileNanoseconds: UInt64
     let pipeline: MTLComputePipelineState
+    private let queue: MTLCommandQueue
 
-    public init(device: MTLDevice) throws(MetalComputeError) {
+    public init(device: MTLDevice, library: MTLLibrary) throws(MetalComputeError) {
         self.device = device
-        let clock = ContinuousClock()
-        var compiled: MTLLibrary?
-        var compileFailure: String?
-        let elapsed = clock.measure {
-            do {
-                compiled = try device.makeLibrary(source: MetalComputeShaderSource.source, options: nil)
-            } catch {
-                compileFailure = String(describing: error)
-            }
-        }
-        guard let library = compiled else { throw .libraryCompilation(compileFailure ?? "unknown") }
-        self.libraryCompileNanoseconds = elapsed.nanoseconds
-
         guard let function = library.makeFunction(name: MetalComputeShaderSource.reduceFunction) else {
             throw .missingFunction(MetalComputeShaderSource.reduceFunction)
         }
@@ -99,6 +94,8 @@ public final class MetalComputeReducer {
         } catch {
             throw .pipeline(String(describing: error))
         }
+        guard let queue = device.makeCommandQueue() else { throw .commandBufferUnavailable }
+        self.queue = queue
     }
 
     /// Reduces every run of every series, in one command buffer, one dispatch per run — then
@@ -115,7 +112,6 @@ public final class MetalComputeReducer {
         runsPerSeries: [[NormalisedRun]],
         plotWidth: Double
     ) throws(MetalComputeError) -> [[NormalisedRun]] {
-        guard let queue = device.makeCommandQueue() else { throw .commandBufferUnavailable }
         guard let commandBuffer = queue.makeCommandBuffer() else { throw .commandBufferUnavailable }
         guard let encoder = commandBuffer.makeComputeCommandEncoder() else { throw .encoderUnavailable }
         encoder.setComputePipelineState(pipeline)

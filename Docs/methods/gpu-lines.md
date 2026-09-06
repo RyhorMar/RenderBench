@@ -70,6 +70,13 @@ This is the only backend so far whose rasterisation is measured rather than infe
 buffer carries its own start and end timestamps, so the `gpu` column is filled from the GPU's clock
 instead of by subtracting one host measurement from another.
 
+Measured against `CoreGraphicsReference` on the reference chart (`ComparisonImage`, `eightCurves()`,
+scale 1): 8188 solid pixels, **0 solid mismatches** — `agrees == true` — and `mismatchesAwayFromEdges`
+of 133, reported but not a criterion per `Docs/methods/equivalence.md`'s own table for this exact
+row. `Docs/methods/gpu-compute-reduction.md` reports the same two numbers for its own,
+independently-reduced draw on the identical fixture and cites this page for them; before this
+sentence existed here, that citation pointed at a page that stated no numbers of its own to match.
+
 ## Verified by
 
 - `Tests/MetalBackendTests/MetalGeometryTests.swift` — segment counts, breaks, pixel-space

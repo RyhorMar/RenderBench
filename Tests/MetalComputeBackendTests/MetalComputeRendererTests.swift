@@ -40,9 +40,16 @@ func encodedRevisionAdvancesOnEveryEncode() {
 @MainActor @Test
 func pointsDrawnIsMeaningfullySmallerThanTheRawWindow() {
     let renderer = MetalComputeRenderer()
+    // The only documented reason `pointsDrawn` may come back `nil` here is "no device on this
+    // host" — skip for that, but a device that exists and still failed to reduce must fail this
+    // test loudly rather than pass on an untested condition.
+    guard renderer.device != nil else { return }
     let frame = windowFrame(pointCount: 20_000)
     let report = renderer.encode(frame)
-    guard let pointsDrawn = report.pointsDrawn else { return }
+    guard let pointsDrawn = report.pointsDrawn else {
+        Issue.record("a device exists but pointsDrawn came back nil — reduction must have failed")
+        return
+    }
     #expect(pointsDrawn > 0)
     #expect(pointsDrawn < 20_000 / 4, "\(pointsDrawn) of 20000 raw points is not a meaningful reduction")
 }

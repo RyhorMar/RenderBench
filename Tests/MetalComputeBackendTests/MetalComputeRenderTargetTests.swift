@@ -82,12 +82,53 @@ func theGPUReductionDrawsCloseToTheCPUReferenceOnTheProjectFixture() throws {
         width: ComparisonImage.width, height: ComparisonImage.height,
         solidColours: solidSeriesColours
     )
-    // `difference.solidMismatches` and `difference.solidPixels` are reported in the card's own
-    // verification report regardless of whether `agrees` holds below. Measured once: 0 of 8188
-    // solid pixels disagree, 132 mismatches away from edges — matching `Docs/methods/gpu-lines.md`'s
-    // own numbers for `MetalBackend` on the identical fixture to within rendering noise.
+    // `difference.solidMismatches` and `difference.solidPixels` are reported in this method's own
+    // verification report regardless of whether `agrees` holds below. Measured once, after the
+    // bucket-count fix in `RunColumns.columns`: 0 of 8188 solid pixels disagree, 133 mismatches
+    // away from edges — matching `Docs/methods/equivalence.md`'s own table of `MetalBackend`
+    // numbers on the identical fixture, since both draw through the same instanced-quad line pass
+    // and were handed the same points to draw once their own reduction had run.
     #expect(difference.solidPixels > 5_000)
     #expect(difference.agrees, "\(difference.solidMismatches) certain pixels disagree")
+}
+
+/// The check above is one-sided by construction: `StructuralDifference.agrees` fails only when a
+/// pixel the reference was certain about goes unfilled, never when this backend draws *more* ink
+/// than the reference anywhere the reference itself had none to be certain about. Doubling every
+/// run's bucket count — exactly the bug `RunColumns.columns` carried before its fix — doubles the
+/// points drawn per run without ever leaving a reference-certain pixel unfilled, so `agrees` stays
+/// `true` straight through that regression (confirmed by reverting the fix and rerunning both this
+/// file's tests: the pixel check above still passed). This test is the density check the pixel
+/// check structurally cannot be, and it exists specifically to catch what that one cannot.
+///
+/// Factor: measured once on this fixture, the CPU path (`policy: .minMax`) emits 7680 points
+/// (8 series × 960) and this backend's GPU path, post-fix, emits 7664 (8 series × 958) — ratio
+/// 0.998. The pre-fix defect emitted 15344 (ratio 1.998, exactly double). `1.5` sits with real
+/// margin above the honest ~1.0 ratio and well below the 2.0 the bug produced, so it separates the
+/// two without being tuned to the current code's exact output.
+@Test
+func gpuReductionPointDensityStaysWithinOneAndAHalfTimesTheCPUBudget() throws {
+    guard let device = MTLCreateSystemDefaultDevice() else { return }
+    let library = try MetalComputeCompiledLibrary(device: device)
+    let reducer = try MetalComputeReducer(device: device, library: library.library)
+
+    let cpuFrame = prepared(LineChartSpec(series: Array(0..<8), policy: .minMax))
+    let cpuPointCount = cpuFrame.series.reduce(0) { total, series in
+        total + series.points.filter { !$0.isBreak }.count
+    }
+
+    let gpuFrame = prepared(LineChartSpec(series: Array(0..<8), policy: .none))
+    let runsPerSeries = gpuFrame.series.map { RunSplitter.runs(in: $0.points) }
+    let reduced = try reducer.reduce(runsPerSeries: runsPerSeries, plotWidth: gpuFrame.plotRect.width)
+    let gpuPointCount = reduced.reduce(0) { total, series in
+        total + series.reduce(0) { $0 + $1.points.count }
+    }
+
+    let ratio = Double(gpuPointCount) / Double(cpuPointCount)
+    #expect(
+        ratio > 1 / 1.5 && ratio < 1.5,
+        "gpu drew \(gpuPointCount) points against the CPU path's \(cpuPointCount) (ratio \(ratio))"
+    )
 }
 
 @Test

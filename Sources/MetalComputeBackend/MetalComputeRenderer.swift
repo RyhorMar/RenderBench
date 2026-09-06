@@ -29,9 +29,17 @@ public final class MetalComputeRenderer: ChartRenderer {
     nonisolated static let sampleCount = 4
 
     let device: MTLDevice?
-    let reducer: MetalComputeReducer?
-    let lineRenderer: MetalComputeLineRenderer?
     let initializationFailure: MetalComputeError?
+
+    /// The reducer and the line renderer, or neither — never one without the other. Two
+    /// independent optionals here previously let "both exist or both are `nil`" be a fact
+    /// maintained only by discipline across every assignment; a `struct` makes the type checker
+    /// enforce it instead.
+    struct GPU {
+        let reducer: MetalComputeReducer
+        let lineRenderer: MetalComputeLineRenderer
+    }
+    let gpu: GPU?
 
     private(set) var geometry = MetalComputeChartGeometry()
     private var layout = ChromeLayout.empty
@@ -49,29 +57,35 @@ public final class MetalComputeRenderer: ChartRenderer {
     init(device: MTLDevice?) {
         guard let device else {
             self.device = nil
-            self.reducer = nil
-            self.lineRenderer = nil
+            self.gpu = nil
             self.initializationFailure = .noDevice
             return
         }
         self.device = device
         do {
-            let reducer = try MetalComputeReducer(device: device)
+            // One compile, shared by both consumers — see `MetalComputeCompiledLibrary`'s own
+            // doc comment for why this can no longer live inside either component's initialiser.
+            let compiledLibrary = try MetalComputeCompiledLibrary(device: device)
+            let reducer = try MetalComputeReducer(device: device, library: compiledLibrary.library)
             let lineRenderer = try MetalComputeLineRenderer(
                 device: device,
+                library: compiledLibrary.library,
                 pixelFormat: MetalComputeRenderTarget.pixelFormat,
                 sampleCount: Self.sampleCount
             )
-            self.reducer = reducer
-            self.lineRenderer = lineRenderer
+            self.gpu = GPU(reducer: reducer, lineRenderer: lineRenderer)
             self.initializationFailure = nil
         } catch {
-            self.reducer = nil
-            self.lineRenderer = nil
+            self.gpu = nil
             self.initializationFailure = error
         }
     }
 
+    /// Encodes one frame: reduces every series on the GPU, builds pixel-space geometry from what
+    /// came back, and reports what will be drawn. `drawCalls` is `geometry.batches.count` — known
+    /// here without touching the GPU render pass itself, the same way `MetalRenderer` counts its
+    /// own: it falls out of the geometry alone, and is the same count
+    /// `MetalComputeLineRenderer.draw` will issue.
     public func encode(_ prepared: PreparedFrame) -> EncodeReport {
         // Known zeros, not unknowable `nil`s: this backend counts its own submissions, so once
         // torn down it genuinely submitted none — the same reasoning `MetalRenderer` reports for
@@ -80,7 +94,7 @@ public final class MetalComputeRenderer: ChartRenderer {
         guard !tornDown else { return EncodeReport(encodeNs: 0, pointsDrawn: 0, drawCalls: 0) }
         defer { encodedRevision += 1 }
 
-        guard let reducer else {
+        guard let gpu else {
             // No device at all: nothing drawn this frame is a fact, not a guess, and it is the
             // same fact `MetalRenderer` reports the same way for the same reason — a host that
             // cannot draw must not post the fastest row in the table.
@@ -88,42 +102,43 @@ public final class MetalComputeRenderer: ChartRenderer {
         }
 
         let clock = ContinuousClock()
-        var built = MetalComputeChartGeometry()
         var pointsDrawn = 0
         var reductionFailed = false
-
         let elapsed = clock.measure {
-            guard prepared.plotRect.isDrawable else { return }
-            let runsPerSeries = prepared.series.map { RunSplitter.runs(in: $0.points) }
-            do {
-                // The synchronous readback lives inside `reduce(runsPerSeries:plotWidth:)` and its
-                // cost is inside this `measure` block on purpose: it is the one price this design
-                // pays that no other backend pays in the same place, and hiding it outside the
-                // timed section would report a frame time this backend never actually achieved.
-                let reduced = try reducer.reduce(runsPerSeries: runsPerSeries, plotWidth: prepared.plotRect.width)
-                for series in reduced {
-                    for run in series { pointsDrawn += run.points.count }
-                }
-                built = MetalComputeChartGeometry.build(prepared, reducedRuns: reduced, scale: prepared.scale)
-            } catch {
-                reductionFailed = true
-            }
+            (geometry, pointsDrawn, reductionFailed) = Self.reduceAndBuildGeometry(prepared, reducer: gpu.reducer)
         }
-        geometry = built
         layout = prepared.chrome
 
-        guard lineRenderer != nil, !reductionFailed else {
+        guard !reductionFailed else {
             return EncodeReport(encodeNs: elapsed.nanoseconds, pointsDrawn: nil, drawCalls: nil)
         }
+        return EncodeReport(encodeNs: elapsed.nanoseconds, pointsDrawn: pointsDrawn, drawCalls: geometry.batches.count)
+    }
 
-        return EncodeReport(
-            encodeNs: elapsed.nanoseconds,
-            pointsDrawn: pointsDrawn,
-            // One draw call per batch, known here without touching the GPU render pass itself,
-            // the same way `MetalRenderer` counts its own: it falls out of the geometry alone,
-            // and is the same count `MetalComputeLineRenderer.draw` will issue.
-            drawCalls: built.batches.count
-        )
+    /// Reduces every series on the GPU and builds this frame's drawable geometry — the step
+    /// `encode(_:)` times with `ContinuousClock.measure`. Split out of `encode(_:)` itself so that
+    /// function's own comments stay about its reporting contract, not about this step.
+    private static func reduceAndBuildGeometry(
+        _ prepared: PreparedFrame,
+        reducer: MetalComputeReducer
+    ) -> (geometry: MetalComputeChartGeometry, pointsDrawn: Int, failed: Bool) {
+        guard prepared.plotRect.isDrawable else { return (MetalComputeChartGeometry(), 0, false) }
+        let runsPerSeries = prepared.series.map { RunSplitter.runs(in: $0.points) }
+        do {
+            // The synchronous readback lives inside `reduce(runsPerSeries:plotWidth:)` and its
+            // cost is included here on purpose: it is the one price this design pays that no
+            // other backend pays in the same place, and hiding it outside the timed section would
+            // report a frame time this backend never actually achieves.
+            let reduced = try reducer.reduce(runsPerSeries: runsPerSeries, plotWidth: prepared.plotRect.width)
+            var pointsDrawn = 0
+            for series in reduced {
+                for run in series { pointsDrawn += run.points.count }
+            }
+            let geometry = MetalComputeChartGeometry.build(prepared, reducedRuns: reduced, scale: prepared.scale)
+            return (geometry, pointsDrawn, false)
+        } catch {
+            return (MetalComputeChartGeometry(), 0, true)
+        }
     }
 
     public func takeDeferredTimes() -> DeferredTimes {
@@ -137,7 +152,7 @@ public final class MetalComputeRenderer: ChartRenderer {
             layout: layout,
             encodedRevision: encodedRevision,
             device: device,
-            lineRenderer: lineRenderer,
+            lineRenderer: gpu?.lineRenderer,
             rasterTime: rasterTime,
             gpuTime: gpuTime
         ))

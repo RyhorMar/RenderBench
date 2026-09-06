@@ -27,9 +27,12 @@ struct MetalComputeUniforms {
 /// reduction is what makes this backend different; the draw is deliberately the same technique, so
 /// the equivalence check is judging the reduction and not a second, unrelated difference in how
 /// the line itself gets to the screen.
+///
+/// Takes an already-compiled `MTLLibrary` rather than compiling its own — see
+/// ``MetalComputeCompiledLibrary`` for why the compile lives above both this type and
+/// ``MetalComputeReducer`` instead of inside either.
 final class MetalComputeLineRenderer {
     let device: MTLDevice
-    let libraryCompileNanoseconds: UInt64
 
     private let pipeline: MTLRenderPipelineState
     private let inFlight: DispatchSemaphore
@@ -43,25 +46,13 @@ final class MetalComputeLineRenderer {
 
     init(
         device: MTLDevice,
+        library: MTLLibrary,
         pixelFormat: MTLPixelFormat,
         sampleCount: Int,
         inFlightFrames: Int = 3
     ) throws(MetalComputeError) {
         precondition(inFlightFrames >= 1, "a ring of no buffers cannot hold a frame")
         self.device = device
-
-        let clock = ContinuousClock()
-        var compiled: MTLLibrary?
-        var compileFailure: String?
-        let elapsed = clock.measure {
-            do {
-                compiled = try device.makeLibrary(source: MetalComputeShaderSource.source, options: nil)
-            } catch {
-                compileFailure = String(describing: error)
-            }
-        }
-        guard let library = compiled else { throw .libraryCompilation(compileFailure ?? "unknown") }
-        self.libraryCompileNanoseconds = elapsed.nanoseconds
 
         guard let vertex = library.makeFunction(name: MetalComputeShaderSource.vertexFunction) else {
             throw .missingFunction(MetalComputeShaderSource.vertexFunction)

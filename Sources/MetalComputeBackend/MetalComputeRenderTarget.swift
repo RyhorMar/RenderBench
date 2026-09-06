@@ -34,9 +34,13 @@ final class MetalComputeRenderTarget {
         guard let queue = device.makeCommandQueue() else { throw .commandBufferUnavailable }
         self.queue = queue
         self.sampleCount = sampleCount
-        self.reducer = try MetalComputeReducer(device: device)
+        // One compile shared by both consumers, the same rule `MetalComputeRenderer.init`
+        // follows — see `MetalComputeCompiledLibrary`'s own doc comment.
+        let compiledLibrary = try MetalComputeCompiledLibrary(device: device)
+        self.reducer = try MetalComputeReducer(device: device, library: compiledLibrary.library)
         self.lineRenderer = try MetalComputeLineRenderer(
             device: device,
+            library: compiledLibrary.library,
             pixelFormat: Self.pixelFormat,
             sampleCount: sampleCount,
             inFlightFrames: 1

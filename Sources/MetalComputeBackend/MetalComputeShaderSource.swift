@@ -1,4 +1,5 @@
 import Foundation
+import Metal
 
 /// The compute kernel and the line-drawing pipeline, as source compiled once when a renderer is
 /// built.
@@ -158,4 +159,29 @@ enum MetalComputeShaderSource {
         return in.colour;
     }
     """
+}
+
+/// The one `MTLLibrary` compile this backend pays, built once and handed to both
+/// ``MetalComputeReducer`` and ``MetalComputeLineRenderer`` so neither compiles its own copy —
+/// two independent `makeLibrary(source:)` calls from the same source string previously doubled
+/// the one-time compile cost and made this file's own "happens once" claim false.
+struct MetalComputeCompiledLibrary {
+    let library: MTLLibrary
+    let compileNanoseconds: UInt64
+
+    init(device: MTLDevice) throws(MetalComputeError) {
+        let clock = ContinuousClock()
+        var compiled: MTLLibrary?
+        var compileFailure: String?
+        let elapsed = clock.measure {
+            do {
+                compiled = try device.makeLibrary(source: MetalComputeShaderSource.source, options: nil)
+            } catch {
+                compileFailure = String(describing: error)
+            }
+        }
+        guard let library = compiled else { throw .libraryCompilation(compileFailure ?? "unknown") }
+        self.library = library
+        self.compileNanoseconds = elapsed.nanoseconds
+    }
 }

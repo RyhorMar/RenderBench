@@ -10,6 +10,14 @@ private func syntheticRun(_ pairs: [(Float, Float)]) -> NormalisedRun {
     NormalisedRun(points: pairs.map { SIMD2<Float>($0.0, $0.1) })
 }
 
+/// `MetalComputeReducer.init` takes an already-compiled library rather than compiling its own —
+/// this test file is not the timed per-frame path, so compiling one library per test here is not
+/// the mistake fixed elsewhere, only a call-site update that fix forces.
+private func reducer(for device: MTLDevice) throws -> MetalComputeReducer {
+    let library = try MetalComputeCompiledLibrary(device: device)
+    return try MetalComputeReducer(device: device, library: library.library)
+}
+
 /// A fresh, independent reference implementation of *this backend's own* bucketing algorithm —
 /// normalised x, after projection, half-open buckets with the last one extended to +infinity —
 /// deliberately not `BenchDownsampling.appendMinMax`. That function buckets raw carrier before
@@ -54,7 +62,7 @@ private func referenceReduce(_ points: [SIMD2<Float>], columns: Int) -> [SIMD2<F
 @Test
 func theGPUKernelMatchesAFreshSwiftReferenceOfTheSameAlgorithm() throws {
     guard let device = MTLCreateSystemDefaultDevice() else { return }
-    let reducer = try MetalComputeReducer(device: device)
+    let reducer = try reducer(for: device)
 
     var pairs: [(Float, Float)] = []
     for step in 0..<47 {
@@ -65,7 +73,9 @@ func theGPUKernelMatchesAFreshSwiftReferenceOfTheSameAlgorithm() throws {
     let run = syntheticRun(pairs)
     let columns = 6
 
-    let reduced = try reducer.reduce(runsPerSeries: [[run]], plotWidth: Double(columns))
+    // `RunColumns.columns` halves its pixel-width budget, so a plot width of `columns * 2` is
+    // what yields exactly `columns` buckets for a run spanning the full `0...1`.
+    let reduced = try reducer.reduce(runsPerSeries: [[run]], plotWidth: Double(columns * 2))
     let actual = reduced[0][0].points
     let expected = referenceReduce(run.points, columns: columns)
 
@@ -82,7 +92,7 @@ func theGPUKernelMatchesAFreshSwiftReferenceOfTheSameAlgorithm() throws {
 @Test
 func aTwoPointRunInOneBucketKeepsCarrierOrder() throws {
     guard let device = MTLCreateSystemDefaultDevice() else { return }
-    let reducer = try MetalComputeReducer(device: device)
+    let reducer = try reducer(for: device)
     let run = syntheticRun([(0.0, 0.9), (1.0, -0.4)])
 
     let reduced = try reducer.reduce(runsPerSeries: [[run]], plotWidth: 1)
@@ -97,7 +107,7 @@ func aTwoPointRunInOneBucketKeepsCarrierOrder() throws {
 @Test
 func aOnePointRunEmitsExactlyThatPoint() throws {
     guard let device = MTLCreateSystemDefaultDevice() else { return }
-    let reducer = try MetalComputeReducer(device: device)
+    let reducer = try reducer(for: device)
     let run = syntheticRun([(0.5, 0.25)])
 
     let reduced = try reducer.reduce(runsPerSeries: [[run]], plotWidth: 4)
@@ -117,7 +127,7 @@ func gpuBucketResultMatchesTheKernelsLayout() {
 @Test
 func multipleSeriesAreReducedIndependently() throws {
     guard let device = MTLCreateSystemDefaultDevice() else { return }
-    let reducer = try MetalComputeReducer(device: device)
+    let reducer = try reducer(for: device)
     let first = syntheticRun((0..<10).map { (Float($0) / 9, 1.0) })
     let second = syntheticRun((0..<10).map { (Float($0) / 9, -1.0) })
 
