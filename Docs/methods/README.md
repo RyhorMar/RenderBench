@@ -20,6 +20,7 @@ what each one costs and where each one lies.
 | [Declarative chart](declarative-chart.md) | Swift Charts `LineMark`, run-splitting at breaks | no |
 | [Shape and Path](shape-path.md) | retained SwiftUI `Shape` per series, index-marked breaks | no |
 | [Core Image](core-image.md) | CPU raster delivered through a `CIColorControls` GPU filter | no |
+| [SceneKit](scenekit.md) | 2D chart as `.line`-primitive geometry in a 3D scene, orthographic camera | no |
 
 ## What each page contains
 

@@ -44,6 +44,7 @@ let package = Package(
         .library(name: "SwiftChartsBackend", targets: ["SwiftChartsBackend"]),
         .library(name: "ShapePathBackend", targets: ["ShapePathBackend"]),
         .library(name: "CoreImageBackend", targets: ["CoreImageBackend"]),
+        .library(name: "SceneKitBackend", targets: ["SceneKitBackend"]),
     ],
     targets: [
         // MARK: Layers
@@ -161,6 +162,17 @@ let package = Package(
             swiftSettings: strictMainActor
         ),
 
+        // Seventh built, and the one whose own hypothesis is that the method is wrong for the
+        // job: a 2D chart inside a 3D scene, viewed through an orthographic camera, with a
+        // `.line` primitive that rasterises at exactly one device pixel regardless of the
+        // geometry's stated width. Main-actor by default like the other retained-mode backends,
+        // for the same reason — `@Observable` state a SwiftUI view reads.
+        .target(
+            name: "SceneKitBackend",
+            dependencies: ["BenchCore", "BenchRuntime", "BenchHost"],
+            swiftSettings: strictMainActor
+        ),
+
         // MARK: Tooling
 
         // The dependency rule is machine-checked because nothing else enforces it: SwiftPM does
@@ -234,6 +246,11 @@ let package = Package(
         .testTarget(
             name: "CoreImageBackendTests",
             dependencies: ["CoreImageBackend", "BenchHost", "BenchScales", "BenchTestSupport"],
+            swiftSettings: strictMainActor
+        ),
+        .testTarget(
+            name: "SceneKitBackendTests",
+            dependencies: ["SceneKitBackend", "BenchHost", "BenchScales", "BenchTestSupport"],
             swiftSettings: strictMainActor
         ),
     ]

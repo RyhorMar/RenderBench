@@ -342,6 +342,39 @@
         "BenchHost",
         "CoreImageBackend"
       ]
+    },
+    "Sources/SceneKitBackend": {
+      "system": [
+        "Foundation",
+        "SwiftUI",
+        "SceneKit",
+        "UIKit",
+        "AppKit",
+        "Metal",
+        "CoreGraphics"
+      ],
+      "local": [
+        "BenchCore",
+        "BenchRuntime",
+        "BenchHost"
+      ]
+    },
+    "Tests/SceneKitBackendTests": {
+      "system": [
+        "Foundation",
+        "Testing",
+        "Metal",
+        "SceneKit",
+        "CoreGraphics"
+      ],
+      "local": [
+        "BenchCore",
+        "BenchRuntime",
+        "BenchScales",
+        "BenchTestSupport",
+        "BenchHost",
+        "SceneKitBackend"
+      ]
     }
   }
 }
