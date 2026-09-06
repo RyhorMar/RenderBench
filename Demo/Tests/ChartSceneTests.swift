@@ -53,12 +53,24 @@ func switchingTheRendererTearsDownTheOutgoingOne() {
     )
 }
 
+/// Guards the literal list below against a catalogue that grew: matching every existing id to one
+/// of the literals (a superset check) would still pass if a fourth backend joined
+/// `Catalogue.renderers` without a matching literal here, leaving it unexercised by
+/// `theSurfaceChangesWhenAFrameIsEncoded` while the three original cases kept passing. Comparing
+/// sets both ways catches that; comparing only "every catalogue id has a literal" would not.
+@MainActor @Test
+func theArgumentListNamesEveryCatalogueEntry() {
+    let literalIDs: Set<String> = ["canvas", "core-animation", "metal"]
+    #expect(literalIDs == Set(Catalogue.renderers.map(\.id)))
+}
+
 // Swift Testing evaluates a parameterized test's `arguments:` outside any actor, so this list
 // cannot be `Catalogue.renderers.map(\.id)`: every conformer's `descriptor` — and, for the Canvas
 // backend, even its plain identifier constant — is isolated to the main actor by the module that
 // declares it, and neither the array nor a key path to `id` can be formed without one. The literal
 // strings below are checked against the live catalogue inside the test body, on the main actor,
-// so a renamed identifier fails loudly here instead of this list silently going stale.
+// so a renamed identifier fails loudly here instead of this list silently going stale. The
+// coverage check above catches the complementary case, an entry added but not listed.
 @MainActor @Test(arguments: ["canvas", "core-animation", "metal"])
 func theSurfaceChangesWhenAFrameIsEncoded(_ id: String) {
     let ticker = ManualTicker()

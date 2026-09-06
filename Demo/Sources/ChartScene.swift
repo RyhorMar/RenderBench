@@ -163,8 +163,10 @@ final class ChartScene {
         statistics = nil
         rasterStatistics = nil
         gpuStatistics = nil
+        pointsSubmitted = 0
         pointsDrawn = nil
         drawCalls = nil
+        failures = []
         framesDrawn = 0
         pipeline.invalidateConfiguration()
     }
@@ -290,12 +292,8 @@ final class ChartScene {
                 presentedTime: deferred.presentedTime,
                 targetTimestamp: tick.targetTimestamp,
                 pointsSubmitted: prepared.pointsSubmitted,
-                // `FrameMetrics` predates backends that cannot count and still requires `Int`;
-                // the honest `nil` a renderer may report is coerced here, in the one place that
-                // reads it, rather than upstream — `pointsDrawn`/`drawCalls` below keep the real
-                // optional for the HUD and the exporter.
-                pointsDrawn: report.pointsDrawn ?? 0,
-                drawCalls: report.drawCalls ?? 0
+                pointsDrawn: report.pointsDrawn,
+                drawCalls: report.drawCalls
             )
         )
         pointsSubmitted = prepared.pointsSubmitted

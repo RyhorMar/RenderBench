@@ -37,9 +37,18 @@ public struct FrameMetrics: Sendable, Equatable, Codable {
     public var pointsSubmitted: Int
     /// Samples the backend actually drew. Divergence from `pointsSubmitted` is the signal that a
     /// backend is buying its frame time by dropping work.
-    public var pointsDrawn: Int
+    ///
+    /// `nil` when the backend cannot say — a declarative view built from data has no notion of
+    /// "samples drawn" to report, and that is a fact about the method, not a missing measurement.
+    /// Zero is a different claim: that the backend counted and found none.
+    public var pointsDrawn: Int?
     /// Draw calls issued.
-    public var drawCalls: Int
+    ///
+    /// `nil` when a backend cannot count them — most notably a retained-mode backend that hands a
+    /// layer tree to a render server deciding its own submissions on its own thread. `nil` also
+    /// when the backend that would draw has no device to draw with at all: a host that cannot
+    /// draw must not report the fastest row in the table.
+    public var drawCalls: Int?
 
     /// CPU cost of preparing and encoding the frame, in nanoseconds.
     ///
@@ -71,8 +80,8 @@ public struct FrameMetrics: Sendable, Equatable, Codable {
         presentedTime: Double? = nil,
         targetTimestamp: Double,
         pointsSubmitted: Int,
-        pointsDrawn: Int,
-        drawCalls: Int
+        pointsDrawn: Int?,
+        drawCalls: Int?
     ) {
         self.frameID = frameID
         self.cpuPrepareNs = cpuPrepareNs
