@@ -1,3 +1,4 @@
+import BenchHost
 import BenchRuntime
 import SwiftUI
 
@@ -7,6 +8,11 @@ import SwiftUI
 /// on screen and the figure in a results file cannot disagree about what p95 means.
 struct HUDView: View {
     let scene: ChartScene
+
+    /// Identity and reporting capabilities of the backend currently drawing. Read fresh every
+    /// `body`, so switching backends changes which rows can show a number without this view
+    /// needing to know that happened.
+    private var descriptor: RendererDescriptor { type(of: scene.renderer).descriptor }
 
     var body: some View {
         VStack(alignment: .trailing, spacing: 2) {
@@ -18,22 +24,35 @@ struct HUDView: View {
                 row("prep p50", milliseconds(statistics.p50Ns))
                 row("prep p95", milliseconds(statistics.p95Ns))
             }
-            if let raster = scene.rasterStatistics {
-                row("draw p50", milliseconds(raster.p50Ns))
-                row("draw p95", milliseconds(raster.p95Ns))
-            }
-            row("points", "\(scene.frame.pointsDrawn)")
+            row("draw p50", rasterValue(\.p50Ns))
+            row("draw p95", rasterValue(\.p95Ns))
+            row("gpu p50", gpuValue(\.p50Ns))
+            row("gpu p95", gpuValue(\.p95Ns))
+            row("points", scene.pointsDrawn.map { "\($0)" } ?? "—")
             row("dropped", "\(scene.droppedFrames)")
             // A refused series is shown, not absorbed. A chart quietly missing a curve is the one
             // failure mode a reader cannot detect from the picture.
-            if scene.frame.failures.isEmpty == false {
-                row("refused", "\(scene.frame.failures.count)")
+            if scene.failures.isEmpty == false {
+                row("refused", "\(scene.failures.count)")
                     .foregroundStyle(.red)
             }
         }
         .font(.system(size: 10, weight: .medium, design: .monospaced))
         .padding(6)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 6))
+    }
+
+    /// A dash where the descriptor says this backend cannot time its own draw pass, never a zero:
+    /// a zero here would read as "the fastest backend measured" rather than "not measured at all".
+    private func rasterValue(_ path: KeyPath<FrameStatistics, UInt64>) -> String {
+        guard descriptor.reportsRasterTime, let raster = scene.rasterStatistics else { return "—" }
+        return milliseconds(raster[keyPath: path])
+    }
+
+    /// See ``rasterValue(_:)``; same reasoning, the GPU-timestamp column.
+    private func gpuValue(_ path: KeyPath<FrameStatistics, UInt64>) -> String {
+        guard descriptor.reportsGPUTime, let gpu = scene.gpuStatistics else { return "—" }
+        return milliseconds(gpu[keyPath: path])
     }
 
     private func row(_ name: String, _ value: String) -> some View {

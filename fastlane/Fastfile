@@ -99,6 +99,33 @@ platform :ios do
     )
   end
 
+  desc "Run the demo scheme's test action on a simulator"
+  lane :demo_tests do
+    stamp
+    generate
+
+    # The scheme's test action, not a named target: a future test target can join the scheme
+    # without this lane having to learn its name.
+    devices_by_runtime = JSON.parse(
+      sh("xcrun", "simctl", "list", "devices", "available", "-j", log: false)
+    )["devices"]
+    # Newest runtime first. `simctl` lists runtimes in installation order, not version order, and
+    # an older one left installed for another project would otherwise win — one that cannot run a
+    # build with this project's deployment target at all.
+    device_name = devices_by_runtime.sort.reverse
+      .flat_map { |_runtime, devices| devices }
+      .find { |device| device["name"].include?("iPhone") }
+      &.fetch("name")
+    UI.user_error!("no iPhone simulator available") unless device_name
+
+    xcodebuild(
+      project: DEMO_PROJECT,
+      scheme: DEMO_SCHEME,
+      destination: "platform=iOS Simulator,name=#{device_name}",
+      test: true
+    )
+  end
+
   desc "Build the demo, install it on a booted simulator and launch it"
   lane :run_demo do
     demo
@@ -118,5 +145,6 @@ platform :ios do
     method_docs
     bench_guard
     demo
+    demo_tests
   end
 end

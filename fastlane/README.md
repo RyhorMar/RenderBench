@@ -71,6 +71,14 @@ Check that the method pages still describe symbols that exist
 
 Build the demo for a simulator
 
+### ios demo_tests
+
+```sh
+[bundle exec] fastlane ios demo_tests
+```
+
+Run the demo scheme's test action on a simulator
+
 ### ios run_demo
 
 ```sh

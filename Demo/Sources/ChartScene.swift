@@ -1,10 +1,15 @@
 import BenchCore
 import BenchDownsampling
 import BenchGenerators
+import BenchHost
 import BenchRuntime
-import CanvasBackend
+import BenchScales
 import Foundation
 import SwiftUI
+
+#if os(iOS)
+import UIKit
+#endif
 
 /// What the demo is showing.
 enum Scenario: String, CaseIterable, Identifiable {
@@ -16,22 +21,40 @@ enum Scenario: String, CaseIterable, Identifiable {
     var id: String { rawValue }
 }
 
-/// Owns the data, the clock and the metrics for one screen.
+/// Owns the data, the clock and the active backend for one screen.
 ///
 /// One scene, one clock. Every chart drawn from this object sees the same frame number, so two of
 /// them side by side cannot drift apart — which is the whole reason the clock is not a property of
-/// a view.
+/// a view. The backend is the one part of this object a screen can swap out from under it:
+/// ``switchRenderer(to:)`` replaces ``renderer`` alone, so the data feeding it never restarts.
 @MainActor
 @Observable
 final class ChartScene {
-    private(set) var frame = CanvasFrame()
+    private(set) var renderer: any ChartRenderer
     private(set) var statistics: FrameStatistics?
     /// Percentiles of the draw pass itself, separate from preparation. `nil` until a draw has
-    /// reported one.
+    /// reported one, or forever on a backend whose descriptor says it cannot report raster time.
     private(set) var rasterStatistics: FrameStatistics?
+    /// Percentiles of GPU execution. `nil` on every backend but the one whose descriptor says it
+    /// reads GPU timestamps.
+    private(set) var gpuStatistics: FrameStatistics?
     private(set) var framesDrawn: UInt64 = 0
     private(set) var droppedFrames: UInt64 = 0
     private(set) var observedHz: Double = 0
+
+    /// Samples handed to the active backend after downsampling, for the most recent frame.
+    private(set) var pointsSubmitted: Int = 0
+    /// Samples the active backend actually drew for the most recent frame. `nil` means this
+    /// backend cannot say, not that it drew none.
+    private(set) var pointsDrawn: Int?
+    /// Draw calls the active backend issued for the most recent frame. `nil` means this backend
+    /// cannot say.
+    private(set) var drawCalls: Int?
+    /// Series the most recent frame's preparation refused, with the reason.
+    private(set) var failures: [SeriesFailure] = []
+
+    /// Which backend is currently drawing.
+    var rendererID: String { type(of: renderer).descriptor.identifier }
 
     /// When the current run began, and the thermal state then. Both come from the pipeline, which
     /// records them at the run's start rather than at the application's launch.
@@ -47,6 +70,12 @@ final class ChartScene {
     /// those differ, and a results file that reported the capacity would overstate the load the
     /// measurement ran at.
     var pointsPerSeries: Int { provider.series.first?.count ?? 0 }
+
+    /// Identifies the current data source without exposing it. `SeriesCollectionProvider` is a
+    /// value type, so two instances with equal contents would compare equal — of no use to a test
+    /// that must tell "the same source" apart from "a new one that happens to look the same".
+    /// `switchRenderer(to:)` never touches this; only `rebuild()` does.
+    internal var providerIdentity: ObjectIdentifier { ObjectIdentifier(sourceTag) }
 
     /// Which signal is on screen.
     ///
@@ -72,34 +101,38 @@ final class ChartScene {
     let windowSeconds: Double = 10
 
     private let metrics = MetricsSink(capacity: 1_200)
-    /// Carries the draw pass's own time out of the Canvas closure. Read on the next tick, one
-    /// frame late — which is stated rather than hidden, and is the only way an immediate-mode
-    /// backend's rasterisation can be timed at all.
-    let rasterTime = RasterTimeRecorder()
     private var pipeline = FramePipeline(windowSeconds: 10, sampleRateHz: 100)
+    private let ticker: any DisplayTicking
     private var clock: FrameClock?
-    private var ticker: DisplayLinkTicker?
     private var subscription: FrameClock.Token?
     private var provider = SeriesCollectionProvider(series: [])
     private var scratch: [Sample] = []
+    /// Reference tag standing in for the data source's identity. See ``providerIdentity``.
+    private var sourceTag = SourceTag()
 
     private var streams: [SignalStream] = []
     private var sourceRateHz: Double = 100
     private var yDomain: ClosedRange<Double> = -1...1
     private var lastTickTimestamp: Double?
 
-    init() {
+    /// - Parameters:
+    ///   - renderer: The backend to start with. Defaults to the catalogue's first entry so a
+    ///     caller that does not care which backend starts still gets one that exists.
+    ///   - ticker: Source of display ticks. A test substitutes a manually driven one; every other
+    ///     caller takes the default, which drives frames from the real display link.
+    init(renderer: any ChartRenderer = Catalogue.renderers[0].make(), ticker: any DisplayTicking = DisplayLinkTicker()) {
+        self.renderer = renderer
+        self.ticker = ticker
         scratch.reserveCapacity(4_096)
         rebuild()
     }
 
     func start() {
         guard clock == nil else { return }
-        let source = DisplayLinkTicker()
-        let created = FrameClock(source: source)
+        let created = FrameClock(source: ticker)
         subscription = created.subscribe { [weak self] tick in self?.advance(tick) }
-        ticker = source
         clock = created
+        renderer.resume()
     }
 
     /// Stops the display link explicitly rather than relying on deallocation.
@@ -113,9 +146,27 @@ final class ChartScene {
         // register an observer that never fired.
         if let subscription { clock?.unsubscribe(subscription) }
         subscription = nil
-        ticker = nil
         clock = nil
         lastTickTimestamp = nil
+        renderer.suspend()
+    }
+
+    /// Replaces the active backend without touching the data feeding it.
+    ///
+    /// The provider, the pipeline and the accumulated series survive: only the renderer — and the
+    /// metrics describing its frames, which describe the outgoing backend and not the data — are
+    /// torn down and reset.
+    func switchRenderer(to entry: RendererEntry) {
+        renderer.teardown()
+        renderer = entry.make()
+        metrics.removeAll()
+        statistics = nil
+        rasterStatistics = nil
+        gpuStatistics = nil
+        pointsDrawn = nil
+        drawCalls = nil
+        framesDrawn = 0
+        pipeline.invalidateConfiguration()
     }
 
     /// Rebuilds the series set for the current scenario and bumps the epoch, so any frame
@@ -154,7 +205,11 @@ final class ChartScene {
         provider = SeriesCollectionProvider(
             series: signals.map { DataSeries(capacity: capacity, metadata: $0.metadata) }
         )
+        sourceTag = SourceTag()
         metrics.removeAll()
+        statistics = nil
+        rasterStatistics = nil
+        gpuStatistics = nil
         framesDrawn = 0
         droppedFrames = 0
 
@@ -176,6 +231,22 @@ final class ChartScene {
     /// Samples produced so far, across all series.
     private var producedCount: Int { streams.first?.producedCount ?? 0 }
 
+    /// The device's own render scale, e.g. `3` on a 3x display.
+    ///
+    /// `UIScreen` does not exist on macOS, where `swift test` runs; a scene built there never
+    /// draws, so the fallback value is never asked to be correct, only to compile. Read through
+    /// the foreground window's scene rather than `UIScreen.main`, which iOS 26 deprecates.
+    private var displayScale: Double {
+        #if os(iOS)
+        let screen = UIApplication.shared.connectedScenes
+            .compactMap { ($0 as? UIWindowScene)?.screen }
+            .first
+        return Double(screen?.scale ?? 1)
+        #else
+        return 1
+        #endif
+    }
+
     private func advance(_ tick: FrameTick) {
         guard isRunning, chartSize.width > 1 else { return }
 
@@ -194,37 +265,57 @@ final class ChartScene {
             policy: policy,
             lineWidth: scenario == .carrier ? 1.0 : 1.5
         )
-        let built = CanvasChartRenderer.buildFrame(
+        let prepared = FramePreparation.prepare(
             provider: provider,
             spec: spec,
             window: plan.window,
             yDomain: yDomain,
-            size: chartSize,
+            size: (width: Double(chartSize.width), height: Double(chartSize.height)),
+            chrome: .forScheme(dark: isDark),
+            scale: displayScale,
             dark: isDark,
+            measuring: ApproximateTextWidth(),
             scratch: &scratch
         )
+        let report = renderer.encode(prepared)
+        let deferred = renderer.takeDeferredTimes()
 
-        // `rasterTime.take()` now carries the revision of the `encode()` call it timed, alongside
-        // the nanoseconds; only the nanoseconds go into `FrameMetrics` today; see the report for
-        // whether that revision is enough to tell this reading apart from an older frame's.
         metrics.record(
             FrameMetrics(
                 frameID: snapshot.frameID,
-                cpuPrepareNs: built.prepareNs,
-                cpuEncodeNs: built.encodeNs,
-                rasterNs: rasterTime.take()?.nanoseconds,
+                cpuPrepareNs: prepared.prepareNs,
+                cpuEncodeNs: report.encodeNs,
+                rasterNs: deferred.raster?.nanoseconds,
+                gpuNs: deferred.gpu?.nanoseconds,
+                presentedTime: deferred.presentedTime,
                 targetTimestamp: tick.targetTimestamp,
-                pointsSubmitted: built.pointsSubmitted,
-                pointsDrawn: built.pointsDrawn,
-                drawCalls: built.drawCalls
+                pointsSubmitted: prepared.pointsSubmitted,
+                // `FrameMetrics` predates backends that cannot count and still requires `Int`;
+                // the honest `nil` a renderer may report is coerced here, in the one place that
+                // reads it, rather than upstream — `pointsDrawn`/`drawCalls` below keep the real
+                // optional for the HUD and the exporter.
+                pointsDrawn: report.pointsDrawn ?? 0,
+                drawCalls: report.drawCalls ?? 0
             )
         )
-        frame = built
+        pointsSubmitted = prepared.pointsSubmitted
+        pointsDrawn = report.pointsDrawn
+        drawCalls = report.drawCalls
+        failures = prepared.failures
         framesDrawn &+= 1
         droppedFrames = pipeline.counters.dropped
         if framesDrawn % 10 == 0 {
             statistics = metrics.cpuStatistics()
             rasterStatistics = metrics.rasterStatistics()
+            gpuStatistics = metrics.gpuStatistics()
         }
     }
 }
+
+/// A reference type whose only job is to have an identity `ObjectIdentifier` can read.
+///
+/// `ChartScene`'s data source is built from value types throughout — `SeriesCollectionProvider`,
+/// `[SignalStream]` — so nothing in it has an identity a test could compare across a
+/// `switchRenderer(to:)` call. This tag is created alongside the source in `rebuild()` and nowhere
+/// else, purely to give `providerIdentity` something to report.
+private final class SourceTag {}

@@ -1,7 +1,7 @@
 import BenchCore
 import BenchDownsampling
+import BenchHost
 import BenchRuntime
-import CanvasBackend
 import Foundation
 import UIKit
 
@@ -14,8 +14,15 @@ import UIKit
 @MainActor
 enum ResultExport {
     /// Assembles a result from the scene's collected metrics.
+    ///
+    /// `nil` when the active backend cannot report `pointsDrawn` or `drawCalls`, not zero: a
+    /// retained-mode backend that never learns its own draw-call count has no honest value to put
+    /// in a field this schema declares non-optional, and filing zero there would claim the
+    /// cheapest row in the table for a number nobody measured.
     static func result(from scene: ChartScene) -> BenchmarkResult? {
-        guard let cpu = scene.statistics else { return nil }
+        guard let cpu = scene.statistics,
+              let pointsDrawn = scene.pointsDrawn,
+              let drawCalls = scene.drawCalls else { return nil }
 
         let screen = UIApplication.shared.connectedScenes
             .compactMap { ($0 as? UIWindowScene)?.screen }
@@ -44,7 +51,7 @@ enum ResultExport {
             cases: [
                 BenchmarkCase(
                     chartKind: .stripChart,
-                    backend: CanvasBackend.identifier,
+                    backend: type(of: scene.renderer).descriptor.identifier,
                     seriesCount: scene.seriesCount,
                     pointsPerSeries: scene.pointsPerSeries,
                     refreshHz: refreshHz,
@@ -56,11 +63,11 @@ enum ResultExport {
                     measuredFrames: cpu.sampleCount,
                     repeatIndex: 1,
                     cpu: cpu,
-                    gpu: nil,
+                    gpu: scene.gpuStatistics,
                     missedDeadlineRatio: nil,
-                    pointsSubmitted: scene.frame.pointsSubmitted,
-                    pointsDrawn: scene.frame.pointsDrawn,
-                    drawCalls: scene.frame.drawCalls,
+                    pointsSubmitted: scene.pointsSubmitted,
+                    pointsDrawn: pointsDrawn,
+                    drawCalls: drawCalls,
                     equivalence: .notChecked
                 )
             ]

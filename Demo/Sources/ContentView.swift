@@ -1,5 +1,5 @@
 import BenchDownsampling
-import CanvasBackend
+import BenchHost
 import SwiftUI
 
 struct ContentView: View {
@@ -49,14 +49,14 @@ struct ContentView: View {
                 .labelStyle(.titleAndIcon)
         }
         .buttonStyle(.bordered)
-        .disabled(scene.statistics == nil)
+        .disabled(scene.statistics == nil || scene.pointsDrawn == nil || scene.drawCalls == nil)
     }
 
     private var titles: some View {
         VStack(alignment: .leading, spacing: 2) {
             Text("RenderBench")
                 .font(.headline)
-            Text("Canvas backend · \(scene.windowSeconds, specifier: "%.0f") s window")
+            Text("\(type(of: scene.renderer).descriptor.displayName) backend · \(scene.windowSeconds, specifier: "%.0f") s window")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -65,6 +65,13 @@ struct ContentView: View {
 
     private var controls: some View {
         VStack(spacing: 10) {
+            Picker("Backend", selection: backendSelection) {
+                ForEach(Catalogue.renderers) { entry in
+                    Text(entry.descriptor.displayName).tag(entry.id)
+                }
+            }
+            .pickerStyle(.segmented)
+
             Picker("Signal", selection: $scene.scenario) {
                 Text(Scenario.eightSeries.rawValue).tag(Scenario.eightSeries)
                 Text(Scenario.carrier.rawValue).tag(Scenario.carrier)
@@ -87,6 +94,19 @@ struct ContentView: View {
                 .frame(maxWidth: .infinity, minHeight: 46, maxHeight: 46, alignment: .topLeading)
                 .fixedSize(horizontal: false, vertical: true)
         }
+    }
+
+    /// `scene.renderer` has no `Binding` of its own — replacing it is `switchRenderer(to:)`, not
+    /// assignment — so the picker binds to the identifier instead and resolves it back through
+    /// the catalogue on write.
+    private var backendSelection: Binding<String> {
+        Binding(
+            get: { scene.rendererID },
+            set: { id in
+                guard let entry = Catalogue.renderers.first(where: { $0.id == id }) else { return }
+                scene.switchRenderer(to: entry)
+            }
+        )
     }
 
     private var explanation: String {
@@ -131,7 +151,7 @@ private struct ChartSurface: View {
     let scene: ChartScene
 
     var body: some View {
-        CanvasChartView(frame: scene.frame, recorder: scene.rasterTime)
+        scene.renderer.surface
             .overlay(alignment: .topTrailing) { HUDView(scene: scene).padding(8) }
     }
 }

@@ -50,13 +50,35 @@ targets:
       - package: RenderBench
         product: BenchRuntime
       - package: RenderBench
+        product: BenchHost
+      - package: RenderBench
         product: CanvasBackend
+      - package: RenderBench
+        product: CoreAnimationBackend
+      - package: RenderBench
+        product: MetalBackend
+
+  RenderBenchDemoTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: Tests
+    dependencies:
+      - target: RenderBenchDemo
+    settings:
+      base:
+        CODE_SIGNING_ALLOWED: NO
+        GENERATE_INFOPLIST_FILE: YES
 
 schemes:
   RenderBenchDemo:
     build:
       targets:
         RenderBenchDemo: all
+        RenderBenchDemoTests: [test]
+    test:
+      targets:
+        - RenderBenchDemoTests
     run:
       config: Debug
     profile:
