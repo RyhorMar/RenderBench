@@ -41,6 +41,7 @@ let package = Package(
         .library(name: "CanvasBackend", targets: ["CanvasBackend"]),
         .library(name: "CoreAnimationBackend", targets: ["CoreAnimationBackend"]),
         .library(name: "MetalBackend", targets: ["MetalBackend"]),
+        .library(name: "SwiftChartsBackend", targets: ["SwiftChartsBackend"]),
     ],
     targets: [
         // MARK: Layers
@@ -126,6 +127,16 @@ let package = Package(
             swiftSettings: strict
         ),
 
+        // Fourth of the nine, and the first that owns its own layout and axis rendering rather
+        // than being handed geometry to stroke: `Chart` decides where a mark sits inside the
+        // rectangle this package hands it. Main-actor by default like `CanvasBackend`, for the
+        // same reason — `@Observable` state a SwiftUI view reads.
+        .target(
+            name: "SwiftChartsBackend",
+            dependencies: ["BenchCore", "BenchRuntime", "BenchHost"],
+            swiftSettings: strictMainActor
+        ),
+
         // MARK: Tooling
 
         // The dependency rule is machine-checked because nothing else enforces it: SwiftPM does
@@ -184,6 +195,11 @@ let package = Package(
         .testTarget(
             name: "CoreAnimationBackendTests",
             dependencies: ["CoreAnimationBackend", "CanvasBackend", "BenchHost", "BenchTestSupport"],
+            swiftSettings: strictMainActor
+        ),
+        .testTarget(
+            name: "SwiftChartsBackendTests",
+            dependencies: ["SwiftChartsBackend", "BenchHost", "BenchTestSupport"],
             swiftSettings: strictMainActor
         ),
     ]

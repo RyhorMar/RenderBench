@@ -17,6 +17,7 @@ what each one costs and where each one lies.
 | [Colour](colour.md) | linear sRGB, categorical palette | yes |
 | [GPU line expansion](gpu-lines.md) | instanced quads, 4x multisampling, GPU timestamps | no |
 | [Equivalence](equivalence.md) | per-channel difference, PSNR, offscreen reference | no |
+| [Declarative chart](declarative-chart.md) | Swift Charts `LineMark`, run-splitting at breaks | no |
 
 ## What each page contains
 

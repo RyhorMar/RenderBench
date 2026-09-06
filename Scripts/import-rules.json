@@ -254,6 +254,35 @@
         "BenchHost",
         "MetalBackend"
       ]
+    },
+    "Sources/SwiftChartsBackend": {
+      "system": [
+        "Foundation",
+        "SwiftUI",
+        "Charts"
+      ],
+      "local": [
+        "BenchCore",
+        "BenchRuntime",
+        "BenchHost"
+      ]
+    },
+    "Tests/SwiftChartsBackendTests": {
+      "system": [
+        "Foundation",
+        "Testing",
+        "SwiftUI",
+        "Charts"
+      ],
+      "local": [
+        "BenchCore",
+        "BenchDownsampling",
+        "BenchRuntime",
+        "BenchScales",
+        "BenchTestSupport",
+        "BenchHost",
+        "SwiftChartsBackend"
+      ]
     }
   }
 }
