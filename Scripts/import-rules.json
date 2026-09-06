@@ -63,6 +63,16 @@
         "BenchScales"
       ]
     },
+    "Sources/BenchHost": {
+      "system": [
+        "Foundation",
+        "SwiftUI"
+      ],
+      "local": [
+        "BenchCore",
+        "BenchRuntime"
+      ]
+    },
     "Sources/CanvasBackend": {
       "system": [
         "Foundation",
@@ -146,6 +156,18 @@
       ],
       "local": [
         "BenchTestSupport"
+      ]
+    },
+    "Tests/BenchHostTests": {
+      "system": [
+        "Foundation",
+        "SwiftUI",
+        "Testing"
+      ],
+      "local": [
+        "BenchCore",
+        "BenchHost",
+        "BenchRuntime"
       ]
     },
     "Tests/CanvasBackendTests": {

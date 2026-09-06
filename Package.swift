@@ -37,6 +37,7 @@ let package = Package(
         .library(name: "BenchGenerators", targets: ["BenchGenerators"]),
         .library(name: "BenchRuntime", targets: ["BenchRuntime"]),
         .library(name: "BenchTestSupport", targets: ["BenchTestSupport"]),
+        .library(name: "BenchHost", targets: ["BenchHost"]),
         .library(name: "CanvasBackend", targets: ["CanvasBackend"]),
         .library(name: "CoreAnimationBackend", targets: ["CoreAnimationBackend"]),
         .library(name: "MetalBackend", targets: ["MetalBackend"]),
@@ -80,6 +81,16 @@ let package = Package(
             name: "BenchTestSupport",
             dependencies: ["BenchCore", "BenchScales"],
             swiftSettings: strict
+        ),
+
+        // The only layer below the backends allowed to import SwiftUI. `ChartRenderer.surface`
+        // is `AnyView`, and that alone would force every layer beneath it to carry SwiftUI;
+        // splitting this out keeps `BenchRuntime` free of UI frameworks, which `CheckImports`
+        // enforces on its behalf.
+        .target(
+            name: "BenchHost",
+            dependencies: ["BenchCore", "BenchRuntime"],
+            swiftSettings: strictMainActor
         ),
 
         // MARK: Backends
@@ -159,6 +170,7 @@ let package = Package(
         .testTarget(name: "BenchGeneratorsTests", dependencies: ["BenchGenerators"], swiftSettings: strict),
         .testTarget(name: "BenchRuntimeTests", dependencies: ["BenchRuntime", "BenchTestSupport"], swiftSettings: strict),
         .testTarget(name: "BenchTestSupportTests", dependencies: ["BenchTestSupport"], swiftSettings: strict),
+        .testTarget(name: "BenchHostTests", dependencies: ["BenchHost", "BenchRuntime"], swiftSettings: strictMainActor),
         .testTarget(
             name: "CanvasBackendTests",
             dependencies: ["CanvasBackend", "BenchTestSupport"],
