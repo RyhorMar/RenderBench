@@ -283,6 +283,33 @@
         "BenchHost",
         "SwiftChartsBackend"
       ]
+    },
+    "Sources/ShapePathBackend": {
+      "system": [
+        "Foundation",
+        "SwiftUI"
+      ],
+      "local": [
+        "BenchCore",
+        "BenchRuntime",
+        "BenchHost"
+      ]
+    },
+    "Tests/ShapePathBackendTests": {
+      "system": [
+        "Foundation",
+        "Testing",
+        "SwiftUI"
+      ],
+      "local": [
+        "BenchCore",
+        "BenchDownsampling",
+        "BenchRuntime",
+        "BenchScales",
+        "BenchTestSupport",
+        "BenchHost",
+        "ShapePathBackend"
+      ]
     }
   }
 }

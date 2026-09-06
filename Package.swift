@@ -42,6 +42,7 @@ let package = Package(
         .library(name: "CoreAnimationBackend", targets: ["CoreAnimationBackend"]),
         .library(name: "MetalBackend", targets: ["MetalBackend"]),
         .library(name: "SwiftChartsBackend", targets: ["SwiftChartsBackend"]),
+        .library(name: "ShapePathBackend", targets: ["ShapePathBackend"]),
     ],
     targets: [
         // MARK: Layers
@@ -137,6 +138,17 @@ let package = Package(
             swiftSettings: strictMainActor
         ),
 
+        // Fifth of the nine, and the first retained-mode backend built from `Shape` rather than a
+        // layer tree or an immediate-mode closure: a `Path` is built once per series, and SwiftUI's
+        // own render server decides when to turn it into pixels. Main-actor by default like
+        // `CanvasBackend` and `SwiftChartsBackend`, for the same reason — `@Observable` state a
+        // SwiftUI view reads.
+        .target(
+            name: "ShapePathBackend",
+            dependencies: ["BenchCore", "BenchRuntime", "BenchHost"],
+            swiftSettings: strictMainActor
+        ),
+
         // MARK: Tooling
 
         // The dependency rule is machine-checked because nothing else enforces it: SwiftPM does
@@ -200,6 +212,11 @@ let package = Package(
         .testTarget(
             name: "SwiftChartsBackendTests",
             dependencies: ["SwiftChartsBackend", "BenchHost", "BenchTestSupport"],
+            swiftSettings: strictMainActor
+        ),
+        .testTarget(
+            name: "ShapePathBackendTests",
+            dependencies: ["ShapePathBackend", "BenchHost", "BenchTestSupport"],
             swiftSettings: strictMainActor
         ),
     ]
