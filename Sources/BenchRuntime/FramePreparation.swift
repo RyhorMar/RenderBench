@@ -82,6 +82,12 @@ public struct PreparedFrame: Sendable {
     public var prepareNs: UInt64
     /// The grid, axes and labels, laid out once for every backend to stroke.
     public var chrome: ChromeLayout = .empty
+    /// Device scale this frame was prepared at, e.g. `3` on a 3x display.
+    ///
+    /// A retained-mode backend needs it for `contentsScale`: leaving that at the default rasterises
+    /// at a fraction of the device's resolution and wins a timing comparison it never actually ran.
+    /// A backend that builds its own vertex buffer needs it to size that buffer in device pixels.
+    public var scale: Double
 
     public init(plotRect: PlotRect = PlotRect(x: 0, y: 0, width: 0, height: 0)) {
         self.plotRect = plotRect
@@ -92,6 +98,7 @@ public struct PreparedFrame: Sendable {
         self.failures = []
         self.pointsSubmitted = 0
         self.prepareNs = 0
+        self.scale = 1
     }
 }
 
@@ -129,6 +136,7 @@ public enum FramePreparation {
         )
         var frame = PreparedFrame(plotRect: plot)
         frame.lineWidth = spec.lineWidth
+        frame.scale = scale
         guard plot.isDrawable, window.upperBound > window.lowerBound else { return frame }
 
         let xScale = TimeScale(domain: window)

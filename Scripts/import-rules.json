@@ -69,7 +69,6 @@
         "SwiftUI"
       ],
       "local": [
-        "BenchCore",
         "BenchRuntime"
       ]
     },

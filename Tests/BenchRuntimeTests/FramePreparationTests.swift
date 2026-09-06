@@ -100,6 +100,27 @@ func thePlotRectLeavesTheDocumentedInsets() {
     #expect(frame.plotRect.isDrawable)
 }
 
+/// `scale` is threaded through to the frame rather than being consumed only by `ChromeLayout`: a
+/// retained-mode backend needs it for `contentsScale` and a backend building its own vertex
+/// buffer needs it to size that buffer in device pixels.
+@Test
+func theFrameReportsTheScaleItWasPreparedAt() {
+    var scratch: [Sample] = []
+    let frame = FramePreparation.prepare(
+        provider: provider([(0, 0), (10, 1)]),
+        spec: LineChartSpec(series: [0]),
+        window: 0...10,
+        yDomain: -1...1,
+        size: (width: 1_024, height: 768),
+        chrome: .forScheme(dark: false),
+        scale: 2,
+        dark: false,
+        measuring: FixedWidth(),
+        scratch: &scratch
+    )
+    #expect(frame.scale == 2)
+}
+
 @Test
 func aPlotTooSmallToDrawIsReportedRatherThanNegative() {
     var scratch: [Sample] = []

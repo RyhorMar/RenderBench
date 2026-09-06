@@ -4,6 +4,7 @@ import SwiftUI
 import Testing
 
 @MainActor
+@Observable
 final class NullRenderer: ChartRenderer {
     static let descriptor = RendererDescriptor(identifier: "null", displayName: "Null", reportsRasterTime: false, reportsGPUTime: false)
     static let capabilities: [Capability] = []
@@ -13,7 +14,9 @@ final class NullRenderer: ChartRenderer {
     func encode(_ frame: PreparedFrame) -> EncodeReport { encoded += 1; return EncodeReport(encodeNs: 0, pointsDrawn: 0, drawCalls: 0) }
     var encodedRevision: UInt64 { UInt64(encoded) }
     func takeDeferredTimes() -> DeferredTimes { .none }
-    var surface: AnyView { AnyView(EmptyView()) }
+    // Reads `encodedRevision`, the property `encode` is required to mutate: this is the shape
+    // every conformer must have for a view driven by `surface` to notice a new frame at all.
+    var surface: AnyView { AnyView(Text("\(encodedRevision)")) }
     func suspend() {}
     func resume() {}
     func teardown() { tornDown = true }
@@ -25,4 +28,12 @@ func anEntryMakesAFreshRendererEachTime() {
     let a = entry.make(), b = entry.make()
     #expect(a !== b)
     #expect(entry.id == "null")
+}
+
+@MainActor @Test
+func encodingAFrameAdvancesEncodedRevision() {
+    let renderer = NullRenderer()
+    let before = renderer.encodedRevision
+    _ = renderer.encode(PreparedFrame())
+    #expect(renderer.encodedRevision == before + 1)
 }
