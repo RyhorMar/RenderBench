@@ -94,10 +94,17 @@ public struct DeferredTimes: Sendable, Equatable {
 /// Everything before `encode` is shared and identical across backends; everything from `encode`
 /// on is the method. A renderer never owns a clock, never prepares data, and never decides where
 /// the grid goes — those are the three ways a comparison stops being one.
-/// Conformers must be `@Observable`, and `encode` must mutate a stored property that `surface`
-/// reads. Nothing in the type system says so: a renderer that encodes into private state the view
-/// never observes compiles, draws its first frame and then freezes. A demo test fires two ticks
-/// at every backend and asserts this number moved.
+/// Conformers must be `@Observable`, and `surface`'s dependency chain must end at state `encode`
+/// actually mutates each call. Most directly, that means a stored property `surface` reads
+/// straight from — what an immediate-mode backend needs to redraw at all. A retained-mode backend
+/// that hands SwiftUI a stable reference to its own object graph (a `CALayer`, say) can satisfy
+/// this a different way: the graph invalidates and redraws itself when `encode` mutates its
+/// properties, independently of `@Observable`'s own tracking, as long as nothing recreates the
+/// graph on every call. Nothing in the type system checks either path: a renderer that encodes
+/// into state neither SwiftUI nor its own retained graph is watching compiles, draws its first
+/// frame and then freezes. This is a requirement on any demo built against this protocol, not a
+/// fact checked by a test in this repository today — a demo test should fire two ticks at every
+/// backend and assert some observable number moved.
 @MainActor
 public protocol ChartRenderer: AnyObject {
     /// Identity and reporting capabilities of this backend, fixed before any instance exists.

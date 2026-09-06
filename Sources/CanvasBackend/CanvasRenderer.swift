@@ -5,8 +5,10 @@ import SwiftUI
 /// `ChartRenderer` conformer for the `Canvas` backend.
 ///
 /// Everything it needs to draw arrives through `encode(_:)` on `PreparedFrame`: no host context,
-/// no device. `init()` carries nothing because this method never touches one — see the card
-/// report's answer to the contract's first open question for why the other two backends agree.
+/// no device. `init()` carries nothing because this method never touches one — and neither does
+/// Core Animation, which reads its render scale from `PreparedFrame.scale` rather than a second,
+/// independently sourced value that could disagree with it; only Metal needs a wider context, and
+/// it gets one by building its own device in `init()` rather than by widening this protocol.
 @MainActor
 @Observable
 public final class CanvasRenderer: ChartRenderer {
@@ -30,8 +32,8 @@ public final class CanvasRenderer: ChartRenderer {
     public init() {}
 
     public func encode(_ prepared: PreparedFrame) -> EncodeReport {
-        defer { encodedRevision += 1 }
         guard !tornDown else { return EncodeReport(encodeNs: 0, pointsDrawn: 0, drawCalls: 0) }
+        defer { encodedRevision += 1 }
         frame = CanvasChartRenderer.encode(prepared)
         return EncodeReport(encodeNs: frame.encodeNs, pointsDrawn: frame.pointsDrawn, drawCalls: frame.drawCalls)
     }

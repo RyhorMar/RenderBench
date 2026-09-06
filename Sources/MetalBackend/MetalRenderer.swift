@@ -8,8 +8,10 @@ import SwiftUI
 ///
 /// `init()` builds the `MTLDevice` and `MetalLineRenderer` this backend needs, once, so a host
 /// with no GPU is a fact known here before the first `encode(_:)` rather than discovered later by
-/// a `try?` buried inside a SwiftUI coordinator created lazily on first appearance. See the card
-/// report's answer to the contract's first open question for why `init()` does not take one either.
+/// a `try?` buried inside a SwiftUI coordinator created lazily on first appearance. It still takes
+/// no parameter of its own: `MTLCreateSystemDefaultDevice()` needs nothing from a caller, and a
+/// `RendererContext` threaded through the protocol for this one backend's sake would give Canvas
+/// and Core Animation a parameter neither of them has any use for.
 @MainActor
 @Observable
 public final class MetalRenderer: ChartRenderer {
@@ -77,8 +79,8 @@ public final class MetalRenderer: ChartRenderer {
     }
 
     public func encode(_ prepared: PreparedFrame) -> EncodeReport {
-        defer { encodedRevision += 1 }
         guard !tornDown else { return EncodeReport(encodeNs: 0, pointsDrawn: 0, drawCalls: 0) }
+        defer { encodedRevision += 1 }
 
         let clock = ContinuousClock()
         var built = MetalChartGeometry()
@@ -96,10 +98,11 @@ public final class MetalRenderer: ChartRenderer {
         return EncodeReport(
             encodeNs: elapsed.nanoseconds,
             pointsDrawn: samplesDrawn(in: prepared),
-            // One draw call per batch: the grid and axes share a batch when they share a style,
-            // and every series is its own — the same count `MetalLineRenderer.draw` will later
-            // issue, known here without touching the GPU because it falls out of the geometry
-            // alone.
+            // One draw call per batch: consecutive chrome lines sharing a colour and width merge
+            // into one — a grid line and an axis line never do, since `ChartChrome` always gives
+            // them different colours and widths — and every series is its own, always separate
+            // from chrome by colour. The same count `MetalLineRenderer.draw` will later issue,
+            // known here without touching the GPU because it falls out of the geometry alone.
             drawCalls: built.batches.count
         )
     }

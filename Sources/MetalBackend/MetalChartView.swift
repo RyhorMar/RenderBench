@@ -128,7 +128,11 @@ struct MetalChartSurface: UIViewRepresentable {
         /// local, because a completion handler queued from an earlier call must keep reporting
         /// the revision it was drawn for even after this property has moved on to a newer one.
         var encodedRevision: UInt64 = 0
-        /// Set when a frame could not be encoded, so a blank chart has a reason attached to it.
+        /// Set when an attempted draw failed inside `draw(in:)` itself — for example no encoder
+        /// available on a frame that otherwise had a device and a renderer. Not set when there is
+        /// no device or renderer at all: that fact is captured once, in `MetalRenderer.init()`,
+        /// and is already why `encode(_:)` reported `nil` counters for this frame rather than
+        /// leaving a blank chart unexplained.
         private(set) var lastFailure: MetalRendererError?
         private let renderer: MetalLineRenderer?
         private let queue: MTLCommandQueue?

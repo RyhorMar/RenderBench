@@ -230,6 +230,21 @@ public final class CoreAnimationChartLayer: CALayer {
         return result
     }
 
+    /// Drops every retained path and the style cache.
+    ///
+    /// `removeFromSuperlayer()`/`sublayers = nil` on the owning renderer's teardown detaches this
+    /// tree from Core Animation's, but this instance still holds its own strong references to
+    /// `gridLayer`, `axisLayer` and every entry in `seriesLayers` — each one still carrying the
+    /// last frame's `CGPath`. Safe to call more than once: clearing an already-empty array and
+    /// re-assigning `nil` cost nothing.
+    public func releaseGeometry() {
+        gridLayer.path = nil
+        axisLayer.path = nil
+        for layer in seriesLayers { layer.path = nil }
+        seriesLayers.removeAll()
+        appliedStyle.removeAll()
+    }
+
     /// Adds shape layers as the series count grows, and keeps them.
     ///
     /// Never shrinks: a scene that alternates between eight series and one would otherwise pay for

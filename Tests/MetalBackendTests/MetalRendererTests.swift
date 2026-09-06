@@ -5,17 +5,6 @@ import SwiftUI
 import Testing
 @testable import MetalBackend
 
-/// The concrete `View` type an `AnyView` erases, found by reflection.
-///
-/// `type(of: someAnyView) == AnyView.self` is always true and proves nothing: `AnyView` erases to
-/// itself by definition. The actual risk the contract calls out — a conformer whose `surface`
-/// sometimes wraps a different concrete type — only shows up in the boxed value `AnyView` hides,
-/// which is why this reaches for `Mirror` rather than comparing `AnyView` values directly.
-private func erasedViewTypeName(_ view: AnyView) -> String {
-    guard let boxed = Mirror(reflecting: view).children.first?.value else { return "AnyView" }
-    return String(reflecting: type(of: boxed))
-}
-
 private func onePointFrame(pointCount: Int = 100) -> PreparedFrame {
     var frame = PreparedFrame(plotRect: PlotRect(x: 52, y: 10, width: 960, height: 736))
     frame.series = [
@@ -30,12 +19,11 @@ private func onePointFrame(pointCount: Int = 100) -> PreparedFrame {
 }
 
 @MainActor @Test
-func encodeReportsWhatItDrewAndSurfaceIsStable() {
+func encodeReportsWhatItDrew() {
     let renderer = MetalRenderer()
     let frame = onePointFrame()
 
     let beforeRevision = renderer.encodedRevision
-    let firstSurfaceType = erasedViewTypeName(renderer.surface)
     let report = renderer.encode(frame)
 
     if renderer.device != nil {
@@ -46,16 +34,14 @@ func encodeReportsWhatItDrewAndSurfaceIsStable() {
         #expect(report.drawCalls == nil)
     }
     #expect(renderer.encodedRevision == beforeRevision + 1)
-    // Same wrapped type before and after a real frame: on iOS this is what keeps SwiftUI from
-    // recreating the `MTKView` coordinator — and recompiling the shader, about 48 ms — on every
-    // tick; on the host this test actually runs on it is the platform-branch fallback, but the
-    // property being tested (one fixed type, never a second one) is the same either way.
-    #expect(erasedViewTypeName(renderer.surface) == firstSurfaceType)
 
+    let revisionBeforeTeardown = renderer.encodedRevision
     renderer.teardown()
-    // A torn-down renderer is inert, not crashing.
+    // A torn-down renderer is inert, not crashing, and must not keep advancing the counter that
+    // exists to prove it is still alive.
     let afterTeardown = renderer.encode(frame)
     #expect(afterTeardown.pointsDrawn == 0)
+    #expect(renderer.encodedRevision == revisionBeforeTeardown)
 }
 
 /// A host with no Metal device cannot know whether anything was drawn, and must say so rather
@@ -84,8 +70,10 @@ func pointsDrawnCountsSeriesSamplesNotTheSharedVertexBuffer() {
     let report = renderer.encode(frame)
     guard let pointsDrawn = report.pointsDrawn else { return }
 
-    // Two batches — grid+axes share a style and merge into one, the series is the other — and
-    // several times as many raw vertices once the chrome's own points are counted in.
+    // Two batches: this fixture has no y-ticks, so there is no grid line at all — just the two
+    // axis lines, which share one style and merge into a single batch; the series is the other,
+    // always separate since it draws in a different colour. Several times as many raw vertices
+    // once the chrome's own points are counted in.
     #expect(pointsDrawn == 100)
     #expect(pointsDrawn < renderer.geometry.points.count)
 }

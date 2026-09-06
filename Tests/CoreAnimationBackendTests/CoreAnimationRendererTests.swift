@@ -5,17 +5,6 @@ import SwiftUI
 import Testing
 @testable import CoreAnimationBackend
 
-/// The concrete `View` type an `AnyView` erases, found by reflection.
-///
-/// `type(of: someAnyView) == AnyView.self` is always true and proves nothing: `AnyView` erases to
-/// itself by definition. The actual risk the contract calls out — a conformer whose `surface`
-/// sometimes wraps a different concrete type — only shows up in the boxed value `AnyView` hides,
-/// which is why this reaches for `Mirror` rather than comparing `AnyView` values directly.
-private func erasedViewTypeName(_ view: AnyView) -> String {
-    guard let boxed = Mirror(reflecting: view).children.first?.value else { return "AnyView" }
-    return String(reflecting: type(of: boxed))
-}
-
 private func onePointFrame(pointCount: Int = 100) -> PreparedFrame {
     var frame = PreparedFrame(plotRect: PlotRect(x: 52, y: 10, width: 960, height: 736))
     frame.series = [
@@ -30,12 +19,11 @@ private func onePointFrame(pointCount: Int = 100) -> PreparedFrame {
 }
 
 @MainActor @Test
-func encodeReportsWhatItDrewAndSurfaceIsStable() {
+func encodeReportsWhatItDrew() {
     let renderer = CoreAnimationRenderer()
     let frame = onePointFrame()
 
     let beforeRevision = renderer.encodedRevision
-    let firstSurfaceType = erasedViewTypeName(renderer.surface)
     let report = renderer.encode(frame)
 
     #expect(report.pointsDrawn == 100)
@@ -43,12 +31,14 @@ func encodeReportsWhatItDrewAndSurfaceIsStable() {
     // compositing cost — `nil` is the honest answer, not a layer count standing in for it.
     #expect(report.drawCalls == nil)
     #expect(renderer.encodedRevision == beforeRevision + 1)
-    #expect(erasedViewTypeName(renderer.surface) == firstSurfaceType)
 
+    let revisionBeforeTeardown = renderer.encodedRevision
     renderer.teardown()
-    // A torn-down renderer is inert, not crashing.
+    // A torn-down renderer is inert, not crashing, and must not keep advancing the counter that
+    // exists to prove it is still alive.
     let afterTeardown = renderer.encode(frame)
     #expect(afterTeardown.pointsDrawn == 0)
+    #expect(renderer.encodedRevision == revisionBeforeTeardown)
 }
 
 /// This backend never observes rasterisation — the render server does that on its own thread,

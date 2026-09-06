@@ -439,3 +439,22 @@ func anUnchangedStrokeStyleIsNotRewritten() {
     #expect(layer.update(with: prepared(seriesCount: 1)).styleWrites == 2)
     #expect(layer.update(with: prepared(seriesCount: 1)).styleWrites == 0)
 }
+
+/// `removeFromSuperlayer()`/`sublayers = nil` on the owning renderer's teardown detaches this tree
+/// from Core Animation's, but this instance keeps its own strong references to every shape layer
+/// — each still holding the last frame's `CGPath` — until `releaseGeometry()` drops them.
+@Test
+func releaseGeometryDropsEveryRetainedPath() {
+    let layer = CoreAnimationChartLayer()
+    layer.frame = CGRect(x: 0, y: 0, width: size.width, height: size.height)
+    layer.update(with: prepared(seriesCount: 3))
+
+    let shapeLayers = (layer.sublayers ?? []).compactMap { $0 as? CAShapeLayer }
+    #expect(shapeLayers.contains { $0.path != nil })
+
+    layer.releaseGeometry()
+    #expect(shapeLayers.allSatisfy { $0.path == nil }, "a shape layer is still holding a path")
+
+    // Harmless the second time: nothing left to release, and nothing to crash on.
+    layer.releaseGeometry()
+}

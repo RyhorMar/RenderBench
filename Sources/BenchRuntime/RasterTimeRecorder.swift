@@ -3,15 +3,21 @@ import Synchronization
 
 /// A nanosecond timing paired with the encode it measures.
 ///
-/// A ring of several frames in flight — Metal's `inFlightFrames` — can finish out of order, so a
-/// reading needs to carry its own frame number rather than borrow whatever revision is current
-/// when it happens to be collected. Without it, a raster reading and a GPU reading picked up on
-/// the same tick can silently describe two different frames, and summing them reports a total for
-/// a frame that never existed.
+/// The hazard is not completions racing each other on the GPU: buffers submitted to one
+/// `MTLCommandQueue` complete in the order they were committed. It is timing, not ordering — a
+/// completion handler runs whenever the GPU gets to it, which can be several ticks after the
+/// `encode()` call it belongs to, so by the time a reading is collected the caller may already be
+/// several encodes past it. A reading needs to carry the revision it was measured for rather than
+/// borrow whatever revision is current when it happens to be picked up — without that, a raster
+/// reading and a GPU reading collected on the same tick can silently describe two different
+/// frames, and summing them reports a total for a frame that never existed.
 public struct RasterTimeReading: Sendable, Equatable {
     /// Time the measured pass took, in nanoseconds.
     public var nanoseconds: UInt64
-    /// `ChartRenderer.encodedRevision` as of the `encode()` call that produced this reading.
+    /// Identifies which encode call produced this reading: a renderer's own revision counter,
+    /// read *after* that call incremented it — the total number of encode calls made so far,
+    /// including the one this reading measures. Comparing it against a renderer's current
+    /// revision compares like with like, both post-increment, rather than being off by one.
     public var encodedRevision: UInt64
 
     public init(nanoseconds: UInt64, encodedRevision: UInt64) {

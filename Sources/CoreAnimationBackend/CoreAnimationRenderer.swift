@@ -26,8 +26,9 @@ public final class CoreAnimationRenderer: ChartRenderer {
     )
     public static var capabilities: [Capability] { CoreAnimationBackend.capabilities }
 
-    /// Not `private`: a test needs to see that `encode(_:)` actually reached this layer, and
-    /// reflection has no reliable way to find a property `@Observable` renames underneath it.
+    /// Not `private`: a test needs to see that `encode(_:)` actually reached this layer. Declaring
+    /// it `let` rather than `var` is unrelated to that visibility — `@Observable` only rewrites
+    /// `var` stored properties for its own tracking, so a `let` here is untouched either way.
     let layer = CoreAnimationChartLayer()
     public private(set) var encodedRevision: UInt64 = 0
     private var tornDown = false
@@ -35,8 +36,8 @@ public final class CoreAnimationRenderer: ChartRenderer {
     public init() {}
 
     public func encode(_ prepared: PreparedFrame) -> EncodeReport {
-        defer { encodedRevision += 1 }
         guard !tornDown else { return EncodeReport(encodeNs: 0, pointsDrawn: 0, drawCalls: 0) }
+        defer { encodedRevision += 1 }
         // Driven from `PreparedFrame.scale` rather than read from a window here: the scale this
         // frame was projected at is already on the frame, and a second source for the same number
         // — the host view's own screen — would only give the two a chance to disagree.
@@ -78,6 +79,7 @@ public final class CoreAnimationRenderer: ChartRenderer {
         tornDown = true
         layer.removeFromSuperlayer()
         layer.sublayers = nil
+        layer.releaseGeometry()
     }
 }
 
