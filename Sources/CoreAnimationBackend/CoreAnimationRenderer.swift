@@ -36,23 +36,20 @@ public final class CoreAnimationRenderer: ChartRenderer {
     public init() {}
 
     public func encode(_ prepared: PreparedFrame) -> EncodeReport {
-        guard !tornDown else { return EncodeReport(encodeNs: 0, pointsDrawn: 0, drawCalls: 0) }
+        // `drawCalls` is `nil` whether torn down or active: the render server tessellates and
+        // submits each shape layer to the GPU on its own thread, after this method has already
+        // returned, so that count is never something this process has — not a layer-dirtied count
+        // standing in for it, and not a torn-down `0` claiming knowledge as absent as when active.
+        // `pointsDrawn` differs: it is this backend's own submission count, so `0` once torn down
+        // is a true report of nothing submitted, not a guess.
+        guard !tornDown else { return EncodeReport(encodeNs: 0, pointsDrawn: 0, drawCalls: nil) }
         defer { encodedRevision += 1 }
         // Driven from `PreparedFrame.scale` rather than read from a window here: the scale this
         // frame was projected at is already on the frame, and a second source for the same number
         // — the host view's own screen — would only give the two a chance to disagree.
         layer.renderScale = CGFloat(prepared.scale)
         let result = layer.update(with: prepared)
-        return EncodeReport(
-            encodeNs: result.encodeNs,
-            pointsDrawn: result.pointsDrawn,
-            // The render server tessellates and submits each shape layer to the GPU on its own
-            // thread, after this method has already returned, so how many submissions that costs
-            // is not something this process observes — only how many layers it dirtied, which is
-            // a different quantity from every other backend's `drawCalls`. `nil` is the honest
-            // answer, not `shapeLayerCount` standing in for a number this backend cannot know.
-            drawCalls: nil
-        )
+        return EncodeReport(encodeNs: result.encodeNs, pointsDrawn: result.pointsDrawn, drawCalls: nil)
     }
 
     // Presentation is the render server's, on its own thread, after this method has already

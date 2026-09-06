@@ -73,7 +73,9 @@ func teardownIsIdempotentAndLeavesTheRendererInert() {
     let report = renderer.encode(manyPointsFrame())
     #expect(report.encodeNs == 0)
     #expect(report.pointsDrawn == 0)
-    #expect(report.drawCalls == 0)
+    // `drawCalls` was never a number this backend has, torn down or active — `nil` here, same as
+    // `drawCallsIsNilBecauseTheRenderServerOwnsSubmission` above, not a `0` this process cannot back.
+    #expect(report.drawCalls == nil)
     #expect(renderer.encodedRevision == revisionAfterTeardown, "a torn-down renderer must not advance further")
 }
 

@@ -119,6 +119,18 @@ func pointsDrawnMatchesPointsSubmitted() {
 /// control — not this backend redrawing anything differently. A tolerance of 1 is this
 /// observation, not the project's general rounding tolerance of 8 used against the Core Graphics
 /// reference elsewhere in this file, which asks a different question.
+///
+/// The max-delta check alone cannot tell that story from a deterministic rounding regression: a
+/// bug that shifted one channel by exactly 1 on every pixel would also have `worst == 1` and pass
+/// forever. So this also counts *how many* bytes differ, not only the worst one. Re-running this
+/// render pair locally (20 and 60 back-to-back renders, with and without concurrent background
+/// load) always reproduced the same shape: 0 differing bytes on almost every pair, and exactly
+/// 3 864 on the render server's first-to-second warm-up transition — never anything in between and
+/// never more. `8 000` gives that observation better than 2x headroom while still rejecting a
+/// systematic bug: a rounding error touching even one whole colour channel across the frame would
+/// disagree on up to 786 432 bytes (1024 × 768, a quarter of the buffer), two orders of magnitude
+/// past this bound. Jitter is small and sparse; a systematic bug is large and uniform — this is the
+/// line between them.
 @MainActor
 @Test
 func twoRendersOfTheSameFrameAgreeToWithinOneLevel() throws {
@@ -127,10 +139,15 @@ func twoRendersOfTheSameFrameAgreeToWithinOneLevel() throws {
     guard let second = SwiftChartsRenderTarget.render(frame) else { Issue.record("no render"); return }
     #expect(first.count == ComparisonImage.byteCount(scale: 1))
     #expect(first.count == second.count)
-    let worst = zip(first, second).reduce(into: 0) { worst, pair in
-        worst = max(worst, abs(Int(pair.0) - Int(pair.1)))
+    var worst = 0
+    var differing = 0
+    for (a, b) in zip(first, second) {
+        let delta = abs(Int(a) - Int(b))
+        if delta != 0 { differing += 1 }
+        worst = max(worst, delta)
     }
     #expect(worst <= 1, "renders of one frame disagreed by up to \(worst) of 255")
+    #expect(differing <= 8_000, "\(differing) of \(first.count) bytes disagreed — too many to be render-server jitter")
 }
 
 /// A gap must be visible as a gap: the render with the break must disagree with a render of the

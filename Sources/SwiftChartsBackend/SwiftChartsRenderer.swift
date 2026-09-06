@@ -30,18 +30,16 @@ public final class SwiftChartsRenderer: ChartRenderer {
     public init() {}
 
     public func encode(_ prepared: PreparedFrame) -> EncodeReport {
-        guard !tornDown else { return EncodeReport(encodeNs: 0, pointsDrawn: 0, drawCalls: 0) }
+        // `drawCalls` is `nil` whether torn down or active: `Chart` compiles its own draw commands
+        // for whatever renders it — Core Animation on iOS — on a thread this process does not
+        // observe, so that count is never something this backend has — not the mark count standing
+        // in for it, and not a torn-down `0` claiming knowledge as absent as when active.
+        // `pointsDrawn` differs: it is this backend's own submission count, so `0` once torn down
+        // is a true report of nothing submitted, not a guess.
+        guard !tornDown else { return EncodeReport(encodeNs: 0, pointsDrawn: 0, drawCalls: nil) }
         defer { encodedRevision += 1 }
         frame = SwiftChartsChartRenderer.encode(prepared)
-        return EncodeReport(
-            encodeNs: frame.encodeNs,
-            pointsDrawn: frame.pointsDrawn,
-            // `Chart` compiles its own draw commands for whatever renders it — Core Animation on
-            // iOS — on a thread this process does not observe, so how many submissions that costs
-            // is not a number this backend has. `nil` is the honest answer, not the mark count
-            // standing in for a different quantity `drawCalls` is defined to be.
-            drawCalls: nil
-        )
+        return EncodeReport(encodeNs: frame.encodeNs, pointsDrawn: frame.pointsDrawn, drawCalls: nil)
     }
 
     public func takeDeferredTimes() -> DeferredTimes { .none }

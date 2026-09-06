@@ -41,6 +41,17 @@ func encodeReportsWhatItDrew() {
     #expect(renderer.encodedRevision == revisionBeforeTeardown)
 }
 
+/// `drawCalls` was never a number this backend has, torn down or active: the render server owns
+/// submission either way. A torn-down `0` here would claim knowledge this backend never possessed,
+/// same as `encodeReportsWhatItDrew` establishes for the active case above.
+@MainActor @Test
+func teardownReportsDrawCallsAsUnknownNotZero() {
+    let renderer = CoreAnimationRenderer()
+    renderer.teardown()
+    let report = renderer.encode(onePointFrame())
+    #expect(report.drawCalls == nil)
+}
+
 /// This backend never observes rasterisation — the render server does that on its own thread,
 /// after `encode(_:)` has returned — and `descriptor.reportsRasterTime == false` says so. A
 /// non-`nil` reading here would be reporting a number nothing actually measured.
