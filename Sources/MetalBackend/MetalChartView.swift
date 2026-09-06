@@ -22,6 +22,8 @@ public struct MetalChartView: View {
     private let geometry: MetalChartGeometry
     private let layout: ChromeLayout
     private let encodedRevision: UInt64
+    private let device: MTLDevice?
+    private let lineRenderer: MetalLineRenderer?
     private let rasterTime: RasterTimeRecorder?
     private let gpuTime: RasterTimeRecorder?
 
@@ -29,16 +31,22 @@ public struct MetalChartView: View {
     ///   - encodedRevision: Which `encode()` call produced `geometry`. Tagged onto whatever this
     ///     draw reports, because with several frames in flight a completion handler can fire for
     ///     an older frame than the one `geometry` now holds.
+    ///   - device, lineRenderer: Owned by `MetalRenderer`, not built here — a host with no device
+    ///     hands both through as `nil`, and the coordinator below never tries to create its own.
     public init(
         geometry: MetalChartGeometry,
         layout: ChromeLayout,
         encodedRevision: UInt64 = 0,
+        device: MTLDevice? = nil,
+        lineRenderer: MetalLineRenderer? = nil,
         rasterTime: RasterTimeRecorder? = nil,
         gpuTime: RasterTimeRecorder? = nil
     ) {
         self.geometry = geometry
         self.layout = layout
         self.encodedRevision = encodedRevision
+        self.device = device
+        self.lineRenderer = lineRenderer
         self.rasterTime = rasterTime
         self.gpuTime = gpuTime
     }
@@ -49,6 +57,8 @@ public struct MetalChartView: View {
                 geometry: geometry,
                 background: layout.background,
                 encodedRevision: encodedRevision,
+                device: device,
+                lineRenderer: lineRenderer,
                 rasterTime: rasterTime,
                 gpuTime: gpuTime
             )
@@ -62,11 +72,13 @@ struct MetalChartSurface: UIViewRepresentable {
     let geometry: MetalChartGeometry
     let background: PaletteColor
     let encodedRevision: UInt64
+    let device: MTLDevice?
+    let lineRenderer: MetalLineRenderer?
     let rasterTime: RasterTimeRecorder?
     let gpuTime: RasterTimeRecorder?
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(background: background, rasterTime: rasterTime, gpuTime: gpuTime)
+        Coordinator(device: device, renderer: lineRenderer, background: background, rasterTime: rasterTime, gpuTime: gpuTime)
     }
 
     func makeUIView(context: Context) -> MTKView {
@@ -104,7 +116,10 @@ struct MetalChartSurface: UIViewRepresentable {
     /// Rebuilding these per update would recompile the shader — 48 ms on an M3 Pro — inside what
     /// is supposed to be a frame.
     final class Coordinator: NSObject, MTKViewDelegate {
-        static let sampleCount = 4
+        /// Mirrors `MetalRenderer.sampleCount` rather than a literal of its own: the view's
+        /// `MTKView.sampleCount` and the pipeline `MetalRenderer` built `renderer` against must
+        /// match, or a draw fails validation.
+        static let sampleCount = MetalRenderer.sampleCount
 
         let device: MTLDevice?
         var geometry = MetalChartGeometry()
@@ -120,20 +135,16 @@ struct MetalChartSurface: UIViewRepresentable {
         private let rasterTime: RasterTimeRecorder?
         private let gpuTime: RasterTimeRecorder?
 
-        init(background: PaletteColor, rasterTime: RasterTimeRecorder?, gpuTime: RasterTimeRecorder?) {
+        /// Takes the device and renderer as built by `MetalRenderer`, rather than building its
+        /// own: a coordinator created lazily by SwiftUI on first appearance is the wrong place to
+        /// discover — and swallow — whether this host can draw at all.
+        init(device: MTLDevice?, renderer: MetalLineRenderer?, background: PaletteColor, rasterTime: RasterTimeRecorder?, gpuTime: RasterTimeRecorder?) {
+            self.device = device
+            self.renderer = renderer
+            self.queue = device?.makeCommandQueue()
             self.background = background
             self.rasterTime = rasterTime
             self.gpuTime = gpuTime
-            let device = MTLCreateSystemDefaultDevice()
-            self.device = device
-            self.queue = device?.makeCommandQueue()
-            self.renderer = device.flatMap {
-                try? MetalLineRenderer(
-                    device: $0,
-                    pixelFormat: MetalRenderTarget.pixelFormat,
-                    sampleCount: Self.sampleCount
-                )
-            }
         }
 
         func mtkView(_ view: MTKView, drawableSizeWillChange size: CGSize) {}

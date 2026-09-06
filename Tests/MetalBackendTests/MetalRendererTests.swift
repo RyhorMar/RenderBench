@@ -38,8 +38,13 @@ func encodeReportsWhatItDrewAndSurfaceIsStable() {
     let firstSurfaceType = erasedViewTypeName(renderer.surface)
     let report = renderer.encode(frame)
 
-    #expect(report.pointsDrawn == 100)
-    #expect(report.drawCalls >= 1)
+    if renderer.device != nil {
+        #expect(report.pointsDrawn == 100)
+        #expect(report.drawCalls == 2)
+    } else {
+        #expect(report.pointsDrawn == nil)
+        #expect(report.drawCalls == nil)
+    }
     #expect(renderer.encodedRevision == beforeRevision + 1)
     // Same wrapped type before and after a real frame: on iOS this is what keeps SwiftUI from
     // recreating the `MTKView` coordinator — and recompiling the shader, about 48 ms — on every
@@ -53,6 +58,22 @@ func encodeReportsWhatItDrewAndSurfaceIsStable() {
     #expect(afterTeardown.pointsDrawn == 0)
 }
 
+/// A host with no Metal device cannot know whether anything was drawn, and must say so rather
+/// than report the geometry's own counts: those are computed without ever touching the GPU and
+/// would otherwise make a host that draws nothing look like the fastest backend in the table.
+/// Built with the `device:` seam rather than relying on the test host actually lacking a GPU,
+/// which nothing here controls.
+@MainActor @Test
+func encodeReportsNilCountsWhenThereIsNoDevice() {
+    let renderer = MetalRenderer(device: nil)
+    #expect(renderer.device == nil)
+
+    let report = renderer.encode(onePointFrame())
+    #expect(report.pointsDrawn == nil)
+    #expect(report.drawCalls == nil)
+    #expect(!renderer.geometry.isEmpty, "geometry is still built for `surface` to draw whatever it can")
+}
+
 /// `pointsDrawn` counts samples, not vertices: `MetalChartGeometry.points` also holds the chrome's
 /// vertices, so reading the count off it directly would report more points than any series
 /// actually submitted.
@@ -61,11 +82,12 @@ func pointsDrawnCountsSeriesSamplesNotTheSharedVertexBuffer() {
     let renderer = MetalRenderer()
     let frame = onePointFrame(pointCount: 100)
     let report = renderer.encode(frame)
+    guard let pointsDrawn = report.pointsDrawn else { return }
 
     // Two batches — grid+axes share a style and merge into one, the series is the other — and
     // several times as many raw vertices once the chrome's own points are counted in.
-    #expect(report.pointsDrawn == 100)
-    #expect(report.pointsDrawn < renderer.geometry.points.count)
+    #expect(pointsDrawn == 100)
+    #expect(pointsDrawn < renderer.geometry.points.count)
 }
 
 /// The mutation this exists to catch leaves `teardown()` setting the flag that makes `encode(_:)`

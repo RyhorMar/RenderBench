@@ -39,7 +39,9 @@ func encodeReportsWhatItDrewAndSurfaceIsStable() {
     let report = renderer.encode(frame)
 
     #expect(report.pointsDrawn == 100)
-    #expect(report.drawCalls >= 1)
+    // The render server, not this process, decides how many submissions its own tessellation and
+    // compositing cost — `nil` is the honest answer, not a layer count standing in for it.
+    #expect(report.drawCalls == nil)
     #expect(renderer.encodedRevision == beforeRevision + 1)
     #expect(erasedViewTypeName(renderer.surface) == firstSurfaceType)
 

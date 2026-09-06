@@ -60,7 +60,13 @@ public enum CanvasChartRenderer {
         frame.yTicks = prepared.yTicks
         frame.pointsSubmitted = prepared.pointsSubmitted
         frame.prepareNs = prepared.prepareNs
-        guard plot.width > 1, plot.height > 1 else { return frame }
+
+        let isDrawable = plot.width > 1 && plot.height > 1
+        // One call for the background fill, always issued by `CanvasChartView.draw(in:size:)`;
+        // the chrome's grouped strokes and one stroke per series follow only when there is a plot
+        // to draw into, mirroring the guard below.
+        frame.drawCalls = 1 + (isDrawable ? chromeStrokeGroupCount(prepared.chrome.lines) + prepared.series.count : 0)
+        guard isDrawable else { return frame }
 
         let clock = ContinuousClock()
         var drawn = 0
@@ -91,5 +97,21 @@ public enum CanvasChartRenderer {
         frame.pointsDrawn = drawn
         frame.encodeNs = elapsed.nanoseconds
         return frame
+    }
+
+    /// Counts the grouped strokes `CanvasChartView.strokeChrome` will issue for chrome lines: one
+    /// per run of consecutive lines sharing a colour and width, the same grouping the view itself
+    /// performs so that two touching lines do not blend their antialiased edges as separate draws.
+    private static func chromeStrokeGroupCount(_ lines: [ChromeLine]) -> Int {
+        var count = 0
+        var index = 0
+        while index < lines.count {
+            let style = lines[index]
+            count += 1
+            while index < lines.count, lines[index].colour == style.colour, lines[index].width == style.width {
+                index += 1
+            }
+        }
+        return count
     }
 }

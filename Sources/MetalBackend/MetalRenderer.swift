@@ -1,14 +1,15 @@
 import BenchHost
 import BenchRuntime
 import Foundation
+import Metal
 import SwiftUI
 
 /// `ChartRenderer` conformer for the Metal backend.
 ///
-/// `encode(_:)` only builds geometry — no `MTLDevice` touched, nothing that can throw. The device,
-/// the pipeline and `MetalLineRenderer` itself live inside ``MetalChartView``'s coordinator,
-/// created lazily by SwiftUI and already tolerant of a host with no GPU. See the card report's
-/// answer to the contract's first open question for why `init()` does not take one either.
+/// `init()` builds the `MTLDevice` and `MetalLineRenderer` this backend needs, once, so a host
+/// with no GPU is a fact known here before the first `encode(_:)` rather than discovered later by
+/// a `try?` buried inside a SwiftUI coordinator created lazily on first appearance. See the card
+/// report's answer to the contract's first open question for why `init()` does not take one either.
 @MainActor
 @Observable
 public final class MetalRenderer: ChartRenderer {
@@ -22,6 +23,23 @@ public final class MetalRenderer: ChartRenderer {
     )
     public static var capabilities: [Capability] { MetalBackend.capabilities }
 
+    /// Multisample count shared with the `MTKView` `MetalChartView` configures: building the
+    /// pipeline against one sample count and drawing into a view configured for another is a
+    /// validation failure at draw time, not a difference in output.
+    ///
+    /// `nonisolated`: a plain `Int` constant, read from `Coordinator`, which is not itself
+    /// main-actor isolated.
+    nonisolated static let sampleCount = 4
+
+    /// `nil` on a host with no Metal device. `encode(_:)` reads this, not a swallowed `try?`, to
+    /// know whether anything can actually draw before it reports a count.
+    let device: MTLDevice?
+    /// `nil` when there is no device, or when building the pipeline failed on one that exists.
+    let lineRenderer: MetalLineRenderer?
+    /// Why `lineRenderer` is `nil`; `nil` itself once it built successfully. Captured here instead
+    /// of swallowed by the `try?` this replaces inside `MetalChartView.Coordinator`.
+    let initializationFailure: MetalRendererError?
+
     /// Last frame `encode(_:)` built. `surface` reads it, so a stalled renderer that stopped
     /// encoding would freeze on whatever is here rather than fail silently.
     private(set) var geometry = MetalChartGeometry()
@@ -31,7 +49,32 @@ public final class MetalRenderer: ChartRenderer {
     private let gpuTime = RasterTimeRecorder()
     private var tornDown = false
 
-    public init() {}
+    public convenience init() {
+        self.init(device: MTLCreateSystemDefaultDevice())
+    }
+
+    /// Test seam: builds a renderer as if the host had no device (or a specific one), without
+    /// needing to fake `MTLCreateSystemDefaultDevice()` itself.
+    init(device: MTLDevice?) {
+        guard let device else {
+            self.device = nil
+            self.lineRenderer = nil
+            self.initializationFailure = .noDevice
+            return
+        }
+        self.device = device
+        do {
+            self.lineRenderer = try MetalLineRenderer(
+                device: device,
+                pixelFormat: MetalRenderTarget.pixelFormat,
+                sampleCount: Self.sampleCount
+            )
+            self.initializationFailure = nil
+        } catch {
+            self.lineRenderer = nil
+            self.initializationFailure = error
+        }
+    }
 
     public func encode(_ prepared: PreparedFrame) -> EncodeReport {
         defer { encodedRevision += 1 }
@@ -43,12 +86,20 @@ public final class MetalRenderer: ChartRenderer {
         geometry = built
         layout = prepared.chrome
 
+        // No device, no line renderer: nothing drawn this frame is a fact, not a guess, and
+        // reporting the geometry's own counts here would be exactly the failure this backend
+        // exists to catch — a host that cannot draw at all posting the fastest row in the table.
+        guard lineRenderer != nil else {
+            return EncodeReport(encodeNs: elapsed.nanoseconds, pointsDrawn: nil, drawCalls: nil)
+        }
+
         return EncodeReport(
             encodeNs: elapsed.nanoseconds,
             pointsDrawn: samplesDrawn(in: prepared),
             // One draw call per batch: the grid and axes share a batch when they share a style,
             // and every series is its own — the same count `MetalLineRenderer.draw` will later
-            // issue, known here without a device because it falls out of the geometry alone.
+            // issue, known here without touching the GPU because it falls out of the geometry
+            // alone.
             drawCalls: built.batches.count
         )
     }
@@ -77,6 +128,8 @@ public final class MetalRenderer: ChartRenderer {
             geometry: geometry,
             layout: layout,
             encodedRevision: encodedRevision,
+            device: device,
+            lineRenderer: lineRenderer,
             rasterTime: rasterTime,
             gpuTime: gpuTime
         ))

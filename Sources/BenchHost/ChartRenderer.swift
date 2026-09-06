@@ -37,12 +37,24 @@ public struct EncodeReport: Sendable, Equatable {
     public var encodeNs: UInt64
     /// Samples this backend actually drew for this frame. Divergence from the count submitted to
     /// `encode` is the signal that a backend is buying its frame time by dropping work.
-    public var pointsDrawn: Int
-    /// Draw calls issued to produce this frame.
-    public var drawCalls: Int
+    ///
+    /// `nil` means this backend cannot say — a declarative view built from data has no notion of
+    /// "samples drawn" to report, and that is a fact about the method, not a missing measurement.
+    /// Zero is a different claim: that the backend counted and found none.
+    public var pointsDrawn: Int?
+    /// Submissions this backend issued to its own drawing API for this frame: the chart's chrome
+    /// included, text excluded. One definition for every conformer, so a column meant to compare
+    /// methods does not silently compare a series count against a batch count.
+    ///
+    /// `nil` when a backend cannot count them — most notably a retained-mode backend that hands a
+    /// layer tree to a render server which decides its own submissions on its own thread, where
+    /// the honest answer is "unknown" rather than a proxy count (layers touched, say) standing in
+    /// for a different quantity. `nil` also when the backend that would draw has no device to draw
+    /// with at all: a host that cannot draw must not report the fastest row in the table.
+    public var drawCalls: Int?
 
     /// Creates a report for one `encode` call.
-    public init(encodeNs: UInt64, pointsDrawn: Int, drawCalls: Int) {
+    public init(encodeNs: UInt64, pointsDrawn: Int?, drawCalls: Int?) {
         self.encodeNs = encodeNs
         self.pointsDrawn = pointsDrawn
         self.drawCalls = drawCalls

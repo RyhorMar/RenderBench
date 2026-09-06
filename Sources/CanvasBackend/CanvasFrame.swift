@@ -28,6 +28,11 @@ public struct CanvasFrame {
     /// Samples actually turned into geometry. Divergence from `pointsSubmitted` means the frame
     /// bought its time by dropping work.
     public var pointsDrawn: Int
+    /// Draw calls this frame costs, by `ChartRenderer.encode`'s definition: submissions to this
+    /// backend's drawing API, chrome included, text excluded. Matches exactly what
+    /// `CanvasChartView.draw(in:size:)` issues — one for the background fill, one per run of
+    /// chrome lines sharing a colour and width, one per series — not the series count alone.
+    public var drawCalls: Int
     /// Nanoseconds spent windowing and downsampling.
     public var prepareNs: UInt64
     /// Nanoseconds spent building geometry.
@@ -43,6 +48,7 @@ public struct CanvasFrame {
         self.failures = []
         self.pointsSubmitted = 0
         self.pointsDrawn = 0
+        self.drawCalls = 0
         self.prepareNs = 0
         self.encodeNs = 0
     }

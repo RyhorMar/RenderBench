@@ -216,7 +216,7 @@ final class ChartScene {
                 targetTimestamp: tick.targetTimestamp,
                 pointsSubmitted: built.pointsSubmitted,
                 pointsDrawn: built.pointsDrawn,
-                drawCalls: built.strokes.count
+                drawCalls: built.drawCalls
             )
         )
         frame = built

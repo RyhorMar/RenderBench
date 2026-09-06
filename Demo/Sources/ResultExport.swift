@@ -60,7 +60,7 @@ enum ResultExport {
                     missedDeadlineRatio: nil,
                     pointsSubmitted: scene.frame.pointsSubmitted,
                     pointsDrawn: scene.frame.pointsDrawn,
-                    drawCalls: scene.frame.strokes.count,
+                    drawCalls: scene.frame.drawCalls,
                     equivalence: .notChecked
                 )
             ]

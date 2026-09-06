@@ -39,7 +39,9 @@ func encodeReportsWhatItDrewAndSurfaceIsStable() {
     let report = renderer.encode(frame)
 
     #expect(report.pointsDrawn == 100)
-    #expect(report.drawCalls >= 1)
+    // One background fill, one group of chrome lines (both axis lines share a colour and width,
+    // and there are no grid lines in this fixture), one stroke for the one series.
+    #expect(report.drawCalls == 3)
     // `encodedRevision` is the handle `surface` and `takeDeferredTimes` both key off; a renderer
     // that stops advancing it looks, to everything downstream, exactly like one that froze.
     #expect(renderer.encodedRevision == beforeRevision + 1)

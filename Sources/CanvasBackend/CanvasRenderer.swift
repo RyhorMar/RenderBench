@@ -33,7 +33,7 @@ public final class CanvasRenderer: ChartRenderer {
         defer { encodedRevision += 1 }
         guard !tornDown else { return EncodeReport(encodeNs: 0, pointsDrawn: 0, drawCalls: 0) }
         frame = CanvasChartRenderer.encode(prepared)
-        return EncodeReport(encodeNs: frame.encodeNs, pointsDrawn: frame.pointsDrawn, drawCalls: frame.strokes.count)
+        return EncodeReport(encodeNs: frame.encodeNs, pointsDrawn: frame.pointsDrawn, drawCalls: frame.drawCalls)
     }
 
     public func takeDeferredTimes() -> DeferredTimes {

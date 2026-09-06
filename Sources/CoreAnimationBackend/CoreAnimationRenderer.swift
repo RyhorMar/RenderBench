@@ -45,7 +45,12 @@ public final class CoreAnimationRenderer: ChartRenderer {
         return EncodeReport(
             encodeNs: result.encodeNs,
             pointsDrawn: result.pointsDrawn,
-            drawCalls: result.shapeLayerCount
+            // The render server tessellates and submits each shape layer to the GPU on its own
+            // thread, after this method has already returned, so how many submissions that costs
+            // is not something this process observes — only how many layers it dirtied, which is
+            // a different quantity from every other backend's `drawCalls`. `nil` is the honest
+            // answer, not `shapeLayerCount` standing in for a number this backend cannot know.
+            drawCalls: nil
         )
     }
 
