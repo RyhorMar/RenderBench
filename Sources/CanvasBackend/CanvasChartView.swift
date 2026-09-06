@@ -70,23 +70,24 @@ public struct CanvasChartView: View {
         }
     }
 
-    /// Strokes lines that share a colour and width as one continuous path, chaining rather than
-    /// moving wherever one line continues the last — the grid's lines never do, the two axis
-    /// lines always do, and that is what turns their shared corner into a joined stroke instead
-    /// of two butt-capped ends.
+    /// Strokes lines that share a colour and width in one `stroke(_:with:lineWidth:)` call, each
+    /// as its own subpath.
+    ///
+    /// Grouping matters here for the same reason it does in ``OffscreenRenderTarget`` — measured
+    /// there: two touching axis lines stroked in separate calls blend their antialiased edges
+    /// into the canvas separately and land on a different byte at their shared corner than the
+    /// same two edges stroked together. Both draw through Core Graphics with the same default cap
+    /// and join, so the same grouping is kept here rather than re-measuring an effect that is a
+    /// property of the rasteriser, not of this call site.
     private func strokeChrome(_ lines: [ChromeLine], in context: inout GraphicsContext) {
         var index = 0
         while index < lines.count {
             let style = lines[index]
             var path = Path()
-            var previousEnd: CGPoint?
             while index < lines.count, lines[index].colour == style.colour, lines[index].width == style.width {
                 let line = lines[index]
-                let start = CGPoint(x: line.x0, y: line.y0)
-                if previousEnd != start { path.move(to: start) }
-                let end = CGPoint(x: line.x1, y: line.y1)
-                path.addLine(to: end)
-                previousEnd = end
+                path.move(to: CGPoint(x: line.x0, y: line.y0))
+                path.addLine(to: CGPoint(x: line.x1, y: line.y1))
                 index += 1
             }
             context.stroke(path, with: .color(colour(style.colour)), lineWidth: style.width)

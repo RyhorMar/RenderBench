@@ -71,24 +71,26 @@ public enum OffscreenRenderTarget {
         return canvas.pixels()
     }
 
-    /// Strokes lines that share a colour and width as one continuous path, chaining rather than
-    /// moving wherever one line continues the last. The grid's lines never do; the two axis lines
-    /// always do, and that turns their shared corner into a joined stroke instead of two
-    /// butt-capped ends that would leave it a pixel short of what a single path draws.
+    /// Strokes lines that share a colour and width in one `strokePath()` call, each as its own
+    /// subpath (`move`, never chained with `addLine` into the previous one).
+    ///
+    /// Measured: stroking the two touching axis lines as separate `strokePath()` calls — one
+    /// naive line at a time — shifts one pixel at their shared corner (1024x768 comparison image,
+    /// `eightCurves()` fixture: byte offset 3,055,824 goes from `938e8eff` to `ada9a9ff`). Two
+    /// antialiased edges blended onto the canvas in separate calls compose differently from the
+    /// same two edges blended once. Grouping by colour and width avoids that; whether a line
+    /// starts a new subpath or continues the last one inside that single call does not — the two
+    /// touching axis lines were confirmed byte-identical either way.
     private static func strokeChrome(_ lines: [ChromeLine], in context: CGContext) {
         var index = 0
         while index < lines.count {
             let style = lines[index]
             context.setLineWidth(CGFloat(style.width))
             context.setStrokeColor(style.colour.cgColor)
-            var previousEnd: CGPoint?
             while index < lines.count, lines[index].colour == style.colour, lines[index].width == style.width {
                 let line = lines[index]
-                let start = CGPoint(x: line.x0, y: line.y0)
-                if previousEnd != start { context.move(to: start) }
-                let end = CGPoint(x: line.x1, y: line.y1)
-                context.addLine(to: end)
-                previousEnd = end
+                context.move(to: CGPoint(x: line.x0, y: line.y0))
+                context.addLine(to: CGPoint(x: line.x1, y: line.y1))
                 index += 1
             }
             context.strokePath()

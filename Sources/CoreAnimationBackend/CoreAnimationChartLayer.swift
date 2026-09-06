@@ -170,14 +170,8 @@ public final class CoreAnimationChartLayer: CALayer {
             let axisLines = prepared.chrome.lines.suffix(2)
             gridLayer.path = chromePath(gridLines)
             axisLayer.path = chromePath(axisLines)
-            if let style = gridLines.first {
-                gridLayer.lineWidth = CGFloat(style.width)
-                gridLayer.strokeColor = style.colour.cgColor
-            }
-            if let style = axisLines.first {
-                axisLayer.lineWidth = CGFloat(style.width)
-                axisLayer.strokeColor = style.colour.cgColor
-            }
+            applyChromeStyle(gridLines, to: gridLayer)
+            applyChromeStyle(axisLines, to: axisLayer)
 
             growSeriesLayers(to: prepared.series.count)
             for (position, series) in prepared.series.enumerated() {
@@ -258,21 +252,22 @@ public final class CoreAnimationChartLayer: CALayer {
         }
     }
 
-    /// Builds one path from a run of chrome lines, chaining rather than moving wherever one line
-    /// continues the last.
+    /// Sets a shape layer's colour and width from the first line of its group, unconditionally.
     ///
-    /// The grid's lines never do; the two axis lines always do — `ChromeLayout` documents that
-    /// order — and chaining is what turns their shared corner into a joined stroke instead of two
-    /// butt-capped ends.
+    /// Not `if let style = lines.first`: a group that goes from non-empty to empty (its path
+    /// already cleared to nothing by ``chromePath(_:)``) must not leave the layer's colour and
+    /// width describing a path that is no longer there.
+    private func applyChromeStyle(_ lines: some Collection<ChromeLine>, to layer: CAShapeLayer) {
+        layer.lineWidth = CGFloat(lines.first?.width ?? 0)
+        layer.strokeColor = lines.first?.colour.cgColor
+    }
+
+    /// Builds one path stroking each line independently.
     private func chromePath(_ lines: some Sequence<ChromeLine>) -> CGMutablePath {
         let path = CGMutablePath()
-        var previousEnd: CGPoint?
         for line in lines {
-            let start = CGPoint(x: line.x0, y: line.y0)
-            if previousEnd != start { path.move(to: start) }
-            let end = CGPoint(x: line.x1, y: line.y1)
-            path.addLine(to: end)
-            previousEnd = end
+            path.move(to: CGPoint(x: line.x0, y: line.y0))
+            path.addLine(to: CGPoint(x: line.x1, y: line.y1))
         }
         return path
     }
