@@ -10,17 +10,23 @@ import SwiftUI
 public struct CanvasChartView: View {
     private let frame: CanvasFrame
     private let recorder: RasterTimeRecorder?
+    private let encodedRevision: UInt64
 
     /// - Parameters:
     ///   - recorder: Collects how long the draw pass took. Without one, this backend reports no
     ///     rasterisation time at all and its published frame cost is preparation plus path
     ///     building — which is not a rendering method's cost.
+    ///   - encodedRevision: Which `encode()` call produced `frame`. Tags the recording so a
+    ///     caller reading it later — this view draws one tick after `encode()`, by construction —
+    ///     knows which frame it belongs to rather than assuming it is the newest one.
     public init(
         frame: CanvasFrame,
-        recorder: RasterTimeRecorder? = nil
+        recorder: RasterTimeRecorder? = nil,
+        encodedRevision: UInt64 = 0
     ) {
         self.frame = frame
         self.recorder = recorder
+        self.encodedRevision = encodedRevision
     }
 
     public var body: some View {
@@ -31,7 +37,7 @@ public struct CanvasChartView: View {
         Canvas(opaque: true, rendersAsynchronously: false) { context, size in
             let clock = ContinuousClock()
             let elapsed = clock.measure { draw(in: &context, size: size) }
-            recorder?.record(nanoseconds: elapsed.nanoseconds)
+            recorder?.record(nanoseconds: elapsed.nanoseconds, encodedRevision: encodedRevision)
         }
     }
 

@@ -1,3 +1,4 @@
+import BenchRuntime
 import Foundation
 
 /// SwiftUI `Canvas` backend: the CPU reference path.
@@ -11,4 +12,10 @@ import Foundation
 public enum CanvasBackend {
     /// Stable identifier used in benchmark metadata and in the comparison matrix.
     public static let identifier = "canvas"
+
+    /// What this backend can do, as measured numbers.
+    ///
+    /// Empty until a device run fills it. A capability declared before it is measured is a
+    /// hypothesis wearing a contract's clothes.
+    public static let capabilities: [Capability] = []
 }

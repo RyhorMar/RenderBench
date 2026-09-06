@@ -81,7 +81,8 @@
         "BenchCore",
         "BenchScales",
         "BenchDownsampling",
-        "BenchRuntime"
+        "BenchRuntime",
+        "BenchHost"
       ]
     },
     "Examples": {
@@ -182,6 +183,7 @@
         "BenchDownsampling",
         "BenchRuntime",
         "BenchTestSupport",
+        "BenchHost",
         "CanvasBackend"
       ]
     },
@@ -189,13 +191,16 @@
       "system": [
         "Foundation",
         "QuartzCore",
-        "CoreGraphics"
+        "CoreGraphics",
+        "SwiftUI",
+        "UIKit"
       ],
       "local": [
         "BenchCore",
         "BenchScales",
         "BenchDownsampling",
-        "BenchRuntime"
+        "BenchRuntime",
+        "BenchHost"
       ]
     },
     "Tests/CoreAnimationBackendTests": {
@@ -203,7 +208,8 @@
         "Foundation",
         "Testing",
         "CoreGraphics",
-        "QuartzCore"
+        "QuartzCore",
+        "SwiftUI"
       ],
       "local": [
         "BenchCore",
@@ -211,6 +217,7 @@
         "BenchDownsampling",
         "BenchRuntime",
         "BenchTestSupport",
+        "BenchHost",
         "CanvasBackend",
         "CoreAnimationBackend"
       ]
@@ -227,7 +234,8 @@
       ],
       "local": [
         "BenchCore",
-        "BenchRuntime"
+        "BenchRuntime",
+        "BenchHost"
       ]
     },
     "Tests/MetalBackendTests": {
@@ -235,6 +243,7 @@
         "Foundation",
         "Metal",
         "Testing",
+        "SwiftUI",
         "simd"
       ],
       "local": [
@@ -242,6 +251,7 @@
         "BenchRuntime",
         "BenchScales",
         "BenchTestSupport",
+        "BenchHost",
         "MetalBackend"
       ]
     }

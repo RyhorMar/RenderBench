@@ -21,17 +21,24 @@ import simd
 public struct MetalChartView: View {
     private let geometry: MetalChartGeometry
     private let layout: ChromeLayout
+    private let encodedRevision: UInt64
     private let rasterTime: RasterTimeRecorder?
     private let gpuTime: RasterTimeRecorder?
 
+    /// - Parameters:
+    ///   - encodedRevision: Which `encode()` call produced `geometry`. Tagged onto whatever this
+    ///     draw reports, because with several frames in flight a completion handler can fire for
+    ///     an older frame than the one `geometry` now holds.
     public init(
         geometry: MetalChartGeometry,
         layout: ChromeLayout,
+        encodedRevision: UInt64 = 0,
         rasterTime: RasterTimeRecorder? = nil,
         gpuTime: RasterTimeRecorder? = nil
     ) {
         self.geometry = geometry
         self.layout = layout
+        self.encodedRevision = encodedRevision
         self.rasterTime = rasterTime
         self.gpuTime = gpuTime
     }
@@ -41,6 +48,7 @@ public struct MetalChartView: View {
             MetalChartSurface(
                 geometry: geometry,
                 background: layout.background,
+                encodedRevision: encodedRevision,
                 rasterTime: rasterTime,
                 gpuTime: gpuTime
             )
@@ -53,6 +61,7 @@ public struct MetalChartView: View {
 struct MetalChartSurface: UIViewRepresentable {
     let geometry: MetalChartGeometry
     let background: PaletteColor
+    let encodedRevision: UInt64
     let rasterTime: RasterTimeRecorder?
     let gpuTime: RasterTimeRecorder?
 
@@ -84,6 +93,7 @@ struct MetalChartSurface: UIViewRepresentable {
     func updateUIView(_ view: MTKView, context: Context) {
         context.coordinator.geometry = geometry
         context.coordinator.background = background
+        context.coordinator.encodedRevision = encodedRevision
         // The scene's tick, arriving as a state change. `draw()` is synchronous and this is the
         // only thing that calls it.
         view.draw()
@@ -99,6 +109,10 @@ struct MetalChartSurface: UIViewRepresentable {
         let device: MTLDevice?
         var geometry = MetalChartGeometry()
         var background: PaletteColor
+        /// Which `encode()` call `geometry` came from. Read at the top of `draw(in:)` into a
+        /// local, because a completion handler queued from an earlier call must keep reporting
+        /// the revision it was drawn for even after this property has moved on to a newer one.
+        var encodedRevision: UInt64 = 0
         /// Set when a frame could not be encoded, so a blank chart has a reason attached to it.
         private(set) var lastFailure: MetalRendererError?
         private let renderer: MetalLineRenderer?
@@ -130,6 +144,11 @@ struct MetalChartSurface: UIViewRepresentable {
                   let drawable = view.currentDrawable,
                   let commandBuffer = queue.makeCommandBuffer() else { return }
 
+            // Captured now, not read from the property inside the completion handler below: with
+            // several frames in flight, `encodedRevision` can have moved to a newer frame by the
+            // time that handler runs, and the reading must stay tagged with the frame it drew.
+            let revision = encodedRevision
+
             // Timed with an explicit pair of readings rather than `measure`: the closure form
             // erases the typed throw to `any Error`, and the point of typing it was to know that
             // a draw failure is the only thing that can arrive here.
@@ -154,7 +173,7 @@ struct MetalChartSurface: UIViewRepresentable {
             let elapsed = clock.now - started
             // A frame that failed to encode reports no time rather than a small one. The
             // alternative is a backend that gets faster the more often it fails to draw.
-            if encoded { rasterTime?.record(nanoseconds: elapsed.nanoseconds) }
+            if encoded { rasterTime?.record(nanoseconds: elapsed.nanoseconds, encodedRevision: revision) }
 
             // The GPU's own clock, not the host's. It arrives after the frame that produced it and
             // is collected on a later tick — the one column in this project that measures
@@ -163,7 +182,7 @@ struct MetalChartSurface: UIViewRepresentable {
                 commandBuffer.addCompletedHandler { buffer in
                     let seconds = buffer.gpuEndTime - buffer.gpuStartTime
                     guard seconds > 0 else { return }
-                    gpuTime.record(nanoseconds: UInt64(seconds * 1_000_000_000))
+                    gpuTime.record(nanoseconds: UInt64(seconds * 1_000_000_000), encodedRevision: revision)
                 }
             }
             if encoded { commandBuffer.present(drawable) }

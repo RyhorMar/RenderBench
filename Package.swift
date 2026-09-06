@@ -100,7 +100,7 @@ let package = Package(
         // are certain to be rewritten.
         .target(
             name: "CanvasBackend",
-            dependencies: ["BenchRuntime"],
+            dependencies: ["BenchRuntime", "BenchHost"],
             swiftSettings: strictMainActor
         ),
 
@@ -113,7 +113,7 @@ let package = Package(
         // express either way.
         .target(
             name: "CoreAnimationBackend",
-            dependencies: ["BenchRuntime"],
+            dependencies: ["BenchRuntime", "BenchHost"],
             swiftSettings: strict
         ),
 
@@ -122,7 +122,7 @@ let package = Package(
         // SwiftPM 6.2 does not compile `.metal` files at all — see `MetalShaderSource`.
         .target(
             name: "MetalBackend",
-            dependencies: ["BenchRuntime"],
+            dependencies: ["BenchRuntime", "BenchHost"],
             swiftSettings: strict
         ),
 
@@ -173,17 +173,17 @@ let package = Package(
         .testTarget(name: "BenchHostTests", dependencies: ["BenchHost", "BenchRuntime"], swiftSettings: strictMainActor),
         .testTarget(
             name: "CanvasBackendTests",
-            dependencies: ["CanvasBackend", "BenchTestSupport"],
+            dependencies: ["CanvasBackend", "BenchHost", "BenchTestSupport"],
             swiftSettings: strictMainActor
         ),
         .testTarget(
             name: "MetalBackendTests",
-            dependencies: ["MetalBackend", "BenchScales", "BenchTestSupport"],
+            dependencies: ["MetalBackend", "BenchHost", "BenchScales", "BenchTestSupport"],
             swiftSettings: strictMainActor
         ),
         .testTarget(
             name: "CoreAnimationBackendTests",
-            dependencies: ["CoreAnimationBackend", "CanvasBackend", "BenchTestSupport"],
+            dependencies: ["CoreAnimationBackend", "CanvasBackend", "BenchHost", "BenchTestSupport"],
             swiftSettings: strictMainActor
         ),
     ]

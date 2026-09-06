@@ -50,23 +50,29 @@ public struct EncodeReport: Sendable, Equatable {
 }
 
 /// Measurements that arrive after the frame that produced them. `nil` = cannot report.
+///
+/// Each reading carries its own ``RasterTimeReading/encodedRevision``, not one shared between
+/// them: a backend with several frames in flight — Metal at `inFlightFrames = 3` — can have its
+/// raster and GPU completions land for two different frames on the same tick, and a caller that
+/// sums the two nanosecond counts without checking their revisions is reporting a total for a
+/// frame that never existed.
 public struct DeferredTimes: Sendable, Equatable {
-    /// Raster time the backend reported for a previous frame, in nanoseconds.
-    public var rasterNs: UInt64?
-    /// GPU time the backend reported for a previous frame, in nanoseconds.
-    public var gpuNs: UInt64?
+    /// Raster time the backend reported for a previous frame.
+    public var raster: RasterTimeReading?
+    /// GPU time the backend reported for a previous frame.
+    public var gpu: RasterTimeReading?
     /// When a previously encoded frame actually appeared, in seconds on the host clock. `nil`
     /// means this backend cannot observe presentation, never that the frame appeared at zero —
     /// for a retained-mode backend this and the missed-deadline ratio are the only honest
     /// measurements available at all.
     public var presentedTime: Double?
     /// No deferred measurement available, for a backend that never reports any of these.
-    public static let none = DeferredTimes(rasterNs: nil, gpuNs: nil, presentedTime: nil)
+    public static let none = DeferredTimes(raster: nil, gpu: nil, presentedTime: nil)
 
     /// Creates a deferred-times value from three independently optional measurements.
-    public init(rasterNs: UInt64?, gpuNs: UInt64?, presentedTime: Double?) {
-        self.rasterNs = rasterNs
-        self.gpuNs = gpuNs
+    public init(raster: RasterTimeReading?, gpu: RasterTimeReading?, presentedTime: Double?) {
+        self.raster = raster
+        self.gpu = gpu
         self.presentedTime = presentedTime
     }
 }

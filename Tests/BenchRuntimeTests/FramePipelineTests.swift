@@ -150,12 +150,12 @@ func theRasterRecorderHandsOverEachRecordingOnce() {
     let recorder = RasterTimeRecorder()
     #expect(recorder.take() == nil)
 
-    recorder.record(nanoseconds: 1_234)
-    #expect(recorder.take() == 1_234)
+    recorder.record(nanoseconds: 1_234, encodedRevision: 7)
+    #expect(recorder.take() == RasterTimeReading(nanoseconds: 1_234, encodedRevision: 7))
     #expect(recorder.take() == nil)
 
     // The newest wins: a frame the collector missed is dropped, not queued.
-    recorder.record(nanoseconds: 1)
-    recorder.record(nanoseconds: 2)
-    #expect(recorder.take() == 2)
+    recorder.record(nanoseconds: 1, encodedRevision: 1)
+    recorder.record(nanoseconds: 2, encodedRevision: 2)
+    #expect(recorder.take() == RasterTimeReading(nanoseconds: 2, encodedRevision: 2))
 }
