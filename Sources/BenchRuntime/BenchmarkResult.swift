@@ -16,6 +16,7 @@ public enum BenchmarkValidationError: Error, Equatable, CustomStringConvertible 
     case exampleInResultsDirectory(runID: String)
     case equivalenceFailed(backend: String)
     case noCases
+    case counterReportedAsZero(field: String, backend: String)
 
     public var description: String {
         switch self {
@@ -37,6 +38,8 @@ public enum BenchmarkValidationError: Error, Equatable, CustomStringConvertible 
             "\(backend) failed the equivalence check, so its timings are not comparable"
         case .noCases:
             "contains no cases, so it measures nothing"
+        case .counterReportedAsZero(let field, let backend):
+            "\(backend) reported \(field) as 0; a counter a backend cannot know is absent, never zero"
         }
     }
 }
@@ -235,8 +238,13 @@ public struct BenchmarkCase: Codable, Sendable, Equatable {
     /// `nil` when nothing in the run could observe presentation.
     public var missedDeadlineRatio: Double?
     public var pointsSubmitted: Int
-    public var pointsDrawn: Int
-    public var drawCalls: Int
+    /// `nil` where the backend cannot know how many points reached the raster — six of the nine
+    /// cannot. Never zero: a zero here reads as "drew nothing", which wins every comparison it
+    /// appears in, and it is not what "cannot report" means.
+    public var pointsDrawn: Int?
+    /// `nil` where the backend cannot count its own draw calls. Never zero: a drawn frame issued
+    /// at least one.
+    public var drawCalls: Int?
     public var equivalence: EquivalenceVerdict
 
     public init(
@@ -254,8 +262,11 @@ public struct BenchmarkCase: Codable, Sendable, Equatable {
         gpu: FrameStatistics? = nil,
         missedDeadlineRatio: Double? = nil,
         pointsSubmitted: Int,
-        pointsDrawn: Int,
-        drawCalls: Int,
+        // No `= nil` default, unlike `raster` and `gpu` above. Those are absent for whole classes
+        // of backend and defaulting them costs nothing; these two are absent per backend, and a
+        // default would let a backend that *can* count silently stop reporting.
+        pointsDrawn: Int?,
+        drawCalls: Int?,
         equivalence: EquivalenceVerdict = .notChecked
     ) {
         self.chartKind = chartKind
@@ -311,6 +322,16 @@ public struct BenchmarkResult: Codable, Sendable, Equatable {
         guard !cases.isEmpty else { throw .noCases }
         for element in cases where element.equivalence == .failed {
             throw .equivalenceFailed(backend: element.backend)
+        }
+        // Checked on the example too, not only on stored results: the example is what a reader
+        // copies, and an example carrying a zero would teach the wrong shape.
+        for element in cases {
+            if element.drawCalls == 0 {
+                throw .counterReportedAsZero(field: "drawCalls", backend: element.backend)
+            }
+            if element.pointsDrawn == 0, element.pointsSubmitted > 0 {
+                throw .counterReportedAsZero(field: "pointsDrawn", backend: element.backend)
+            }
         }
         guard isStoredResult else { return }
 

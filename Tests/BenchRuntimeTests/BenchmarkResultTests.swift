@@ -223,3 +223,68 @@ func theHardwareIdentifierSaysWhenItIsPretending() {
         #expect(identifier.contains("simulator"))
     }
 }
+
+// MARK: Counters a backend cannot know
+
+/// Six of the nine backends know neither counter. Absence has to survive the round trip as
+/// absence: a decoder that turned it into a zero would publish "drew nothing" as a measurement.
+@Test
+func anAbsentCounterDecodesAsNilRatherThanZero() throws {
+    let withoutCounters = validCase
+        .replacingOccurrences(of: "\"pointsDrawn\": 2512, ", with: "")
+        .replacingOccurrences(of: "\"drawCalls\": 8,", with: "")
+    let result = try decode(json(cases: withoutCounters))
+    #expect(result.cases[0].pointsDrawn == nil)
+    #expect(result.cases[0].drawCalls == nil)
+    #expect(result.cases[0].pointsDrawn != 0)
+    #expect(throws: Never.self) { try result.validate(isStoredResult: true) }
+}
+
+/// The other half of the round trip, and the reason the schema says `additionalProperties: false`
+/// with no null type: an unknown counter leaves the key out entirely rather than writing `null`.
+@Test
+func anUnknownCounterIsEncodedAsAnAbsentKeyNotNull() throws {
+    let source = try decode(
+        json(
+            cases: validCase
+                .replacingOccurrences(of: "\"pointsDrawn\": 2512, ", with: "")
+                .replacingOccurrences(of: "\"drawCalls\": 8,", with: "")
+        )
+    )
+    let encoded = try BenchmarkResult.encoder().encode(source)
+    let text = String(decoding: encoded, as: UTF8.self)
+    #expect(!text.contains("pointsDrawn"))
+    #expect(!text.contains("drawCalls"))
+    #expect(!text.contains("null"))
+}
+
+/// A drawn frame issued at least one draw call. A zero in this field is a backend saying "I do not
+/// know" in the one vocabulary the format reserves for a measurement.
+@Test
+func aZeroDrawCountIsRejected() throws {
+    let zeroed = validCase.replacingOccurrences(of: "\"drawCalls\": 8", with: "\"drawCalls\": 0")
+    let result = try decode(json(cases: zeroed))
+    #expect(throws: BenchmarkValidationError.counterReportedAsZero(field: "drawCalls", backend: "canvas")) {
+        try result.validate(isStoredResult: true)
+    }
+}
+
+/// Points submitted but none drawn is either a backend that dropped every point or one that could
+/// not count; neither is a row worth publishing.
+@Test
+func drawingNoneOfTheSubmittedPointsIsRejected() throws {
+    let zeroed = validCase.replacingOccurrences(of: "\"pointsDrawn\": 2512", with: "\"pointsDrawn\": 0")
+    let result = try decode(json(cases: zeroed))
+    #expect(throws: BenchmarkValidationError.counterReportedAsZero(field: "pointsDrawn", backend: "canvas")) {
+        try result.validate(isStoredResult: true)
+    }
+}
+
+/// The zero rule applies to the example too, not only to stored results: the example is the shape
+/// a reader copies.
+@Test
+func aZeroCounterIsRejectedInAnUnstoredResultAsWell() throws {
+    let zeroed = validCase.replacingOccurrences(of: "\"drawCalls\": 8", with: "\"drawCalls\": 0")
+    let result = try decode(json(cases: zeroed))
+    #expect(throws: (any Error).self) { try result.validate(isStoredResult: false) }
+}

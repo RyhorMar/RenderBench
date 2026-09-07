@@ -15,14 +15,15 @@ import UIKit
 enum ResultExport {
     /// Assembles a result from the scene's collected metrics.
     ///
-    /// `nil` when the active backend cannot report `pointsDrawn` or `drawCalls`, not zero: a
+    /// `nil` only when the scene has no statistics yet. A backend that cannot report
+    /// `pointsDrawn` or `drawCalls` no longer blocks the export: those two fields carry the
+    /// absence into the file, which is what the format is for. Formerly this refused outright,
+    /// and eight of the nine backends could never be exported at all. Not zero: a
     /// retained-mode backend that never learns its own draw-call count has no honest value to put
     /// in a field this schema declares non-optional, and filing zero there would claim the
     /// cheapest row in the table for a number nobody measured.
     static func result(from scene: ChartScene) -> BenchmarkResult? {
-        guard let cpu = scene.statistics,
-              let pointsDrawn = scene.pointsDrawn,
-              let drawCalls = scene.drawCalls else { return nil }
+        guard let cpu = scene.statistics else { return nil }
 
         let screen = UIApplication.shared.connectedScenes
             .compactMap { ($0 as? UIWindowScene)?.screen }
@@ -66,8 +67,8 @@ enum ResultExport {
                     gpu: scene.gpuStatistics,
                     missedDeadlineRatio: nil,
                     pointsSubmitted: scene.pointsSubmitted,
-                    pointsDrawn: pointsDrawn,
-                    drawCalls: drawCalls,
+                    pointsDrawn: scene.pointsDrawn,
+                    drawCalls: scene.drawCalls,
                     equivalence: .notChecked
                 )
             ]

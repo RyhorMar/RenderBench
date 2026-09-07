@@ -77,9 +77,12 @@ func exampleResult() -> BenchmarkResult {
                 drawCalls: 8,
                 equivalence: .notChecked
             ),
+            // A second backend, and deliberately one that reports neither counter: the example is
+            // what a reader copies, so it has to show both shapes — a row that knows, and a row
+            // that says so by leaving the field out rather than by writing a zero.
             BenchmarkCase(
                 chartKind: .stripChart,
-                backend: "canvas",
+                backend: "core-animation",
                 seriesCount: 8,
                 pointsPerSeries: 100_000,
                 refreshHz: 120,
@@ -91,8 +94,8 @@ func exampleResult() -> BenchmarkResult {
                 gpu: nil,
                 missedDeadlineRatio: 0.31,
                 pointsSubmitted: 2_512,
-                pointsDrawn: 2_512,
-                drawCalls: 8,
+                pointsDrawn: nil,
+                drawCalls: nil,
                 equivalence: .notChecked
             ),
         ]
@@ -135,6 +138,21 @@ do {
     ]
     for (block, field) in mustRequire where !required(of: block).contains(field) {
         problems.append("Benchmarks/schema.json: \(block).\(field) is no longer required")
+    }
+
+    // The inverse, and it guards a rule the `required` list cannot express on its own: six of the
+    // nine backends know neither counter. Requiring either one again forces every row to carry a
+    // number, and the only number available to a backend that cannot count is a zero — which is
+    // exactly the value the whole result format exists to keep out.
+    func caseRequired() -> Set<String> {
+        let cases = properties["cases"] as? [String: Any] ?? [:]
+        let items = cases["items"] as? [String: Any] ?? [:]
+        return Set(items["required"] as? [String] ?? [])
+    }
+    for field in ["pointsDrawn", "drawCalls"] where caseRequired().contains(field) {
+        problems.append(
+            "Benchmarks/schema.json: cases.\(field) is required again; a backend that cannot count it would have to write a zero"
+        )
     }
 } catch {
     problems.append("Benchmarks/schema.json: \(error)")

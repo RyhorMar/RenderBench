@@ -136,8 +136,6 @@
           "repeatIndex",
           "cpu",
           "pointsSubmitted",
-          "pointsDrawn",
-          "drawCalls",
           "equivalence"
         ],
         "properties": {
@@ -200,12 +198,13 @@
           },
           "pointsDrawn": {
             "type": "integer",
-            "minimum": 0,
-            "description": "Divergence from pointsSubmitted means the backend bought its frame time by dropping work."
+            "minimum": 1,
+            "description": "Divergence from pointsSubmitted means the backend bought its frame time by dropping work. Absent where the backend cannot know how many points reached the raster — six of the nine cannot. Never zero: a zero reads as \"drew nothing\" and wins every comparison it appears in."
           },
           "drawCalls": {
             "type": "integer",
-            "minimum": 0
+            "minimum": 1,
+            "description": "Absent where the backend cannot count its own draw calls. Never zero: a drawn frame issued at least one."
           },
           "equivalence": {
             "enum": [

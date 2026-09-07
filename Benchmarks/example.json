@@ -24,7 +24,7 @@
       "warmupFrames" : 120
     },
     {
-      "backend" : "canvas",
+      "backend" : "core-animation",
       "chartKind" : "strip-chart",
       "cpu" : {
         "maxNs" : 41000000,
@@ -33,11 +33,9 @@
         "p99Ns" : 16400000,
         "sampleCount" : 1200
       },
-      "drawCalls" : 8,
       "equivalence" : "notChecked",
       "measuredFrames" : 1200,
       "missedDeadlineRatio" : 0.31,
-      "pointsDrawn" : 2512,
       "pointsPerSeries" : 100000,
       "pointsSubmitted" : 2512,
       "policy" : "lttb",
