@@ -68,3 +68,7 @@ configuration and the git SHA it came from, and the raw run is checked in under
 `Benchmarks/results/`. Simulator timings are never published: Metal is translated there, the
 thermal envelope does not exist and ProMotion is unavailable. A number without a run behind it
 is labelled a hypothesis, in this README and in the comparison matrix alike.
+
+## Licence
+
+MIT — see [`LICENSE`](LICENSE).
