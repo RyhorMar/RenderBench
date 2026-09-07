@@ -2,7 +2,10 @@ import BenchDownsampling
 import BenchHost
 import SwiftUI
 
-struct ContentView: View {
+/// The one screen where a single scene switches live between every backend, kept distinct from
+/// ``MethodScreen``: there each pushed screen owns one renderer for its lifetime, here one scene
+/// owns a sequence of renderers via ``ChartScene/switchRenderer(to:)``.
+struct CompareScreen: View {
     @State private var scene = ChartScene()
     // Read inside the view that owns the renderer, not at App level: at App level the value is
     // aggregated across scenes and reports active while this one is not.
@@ -128,8 +131,10 @@ struct ContentView: View {
 /// This is a boundary, not decoration. The frame geometry changes sixty times a second, so a body
 /// that reads it is re-evaluated sixty times a second and takes everything else declared alongside
 /// it along. Keeping the controls out of that body means the pickers are built once instead of
-/// once per frame.
-private struct ChartPane: View {
+/// once per frame. Not `private`: ``MethodScreen`` shares this boundary, since the same geometry
+/// argument applies to a screen with one fixed backend as much as to one that switches between
+/// them.
+struct ChartPane: View {
     let scene: ChartScene
 
     var body: some View {

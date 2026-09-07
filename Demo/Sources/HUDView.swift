@@ -17,6 +17,14 @@ struct HUDView: View {
 
     var body: some View {
         VStack(alignment: .trailing, spacing: 2) {
+            // The identifier names the value cell alone, not the row: a UI test reads this text
+            // as a number and expects it to climb, which `row`'s shared label half never does.
+            HStack(spacing: 6) {
+                Text("frames").foregroundStyle(.secondary)
+                Text("\(scene.framesDrawn)")
+                    .monospacedDigit()
+                    .accessibilityIdentifier("hud.frames")
+            }
             row("fps", String(format: "%.0f", scene.observedHz))
             row("policy", policyLabel)
             // Two columns, not one. "prep" is preparation plus geometry building; "draw" is the
