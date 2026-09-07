@@ -1,7 +1,11 @@
 name: CI
 
 on:
+  # Scoped to `main`, not every branch: this job runs on `macos-26`, and GitHub bills a macOS
+  # runner-minute at 10x against the account's included quota — an unscoped `push:` burns that
+  # budget on every commit to every work branch, not only the ones that reach `main`.
   push:
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
