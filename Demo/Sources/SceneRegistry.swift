@@ -27,8 +27,18 @@ final class SceneRegistry {
     }
 
     /// Stops and releases the scene for `rendererID` if it is still alive, then forgets the entry
-    /// either way. A nil scene means the screen's view was already released before its route left
-    /// the path — nothing left to tear down.
+    /// either way.
+    ///
+    /// A nil scene is *not* proven to mean nothing is left to tear down — only that this registry
+    /// can no longer reach it. In the ordinary pop this observer fires before SwiftUI releases the
+    /// popped view's state, so the scene is normally still here. But at least two conformers'
+    /// `teardown()` detaches from a retain path this registry does not otherwise hold — Core
+    /// Animation's from the `UIView` behind its `UIViewRepresentable`, SceneKit's from its own
+    /// scene graph — and neither `ChartScene` nor any `ChartRenderer` defines `deinit`. If the
+    /// scene were ever released before this fires, those two would stay attached to a live view or
+    /// scene hierarchy with nothing left to detach them. Whether that can happen is what the
+    /// screen-lifecycle tests after this card exist to answer, not something this comment can
+    /// assert.
     func teardown(_ rendererID: String) {
         if let scene = scenes[rendererID]?.scene {
             scene.stop()
