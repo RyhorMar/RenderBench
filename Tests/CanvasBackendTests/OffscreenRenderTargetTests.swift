@@ -1,7 +1,9 @@
 import BenchCore
 import BenchDownsampling
 import BenchRuntime
+import CoreGraphics
 import Foundation
+import ImageIO
 import Testing
 @testable import CanvasBackend
 
@@ -158,12 +160,48 @@ func theStoredReferenceStillMatches() throws {
         Issue.record("no stored reference; regenerate with WRITE_GOLDENS=1 swift test")
         return
     }
-    // The comparison is against the freshly rendered bytes, and the PNG is what a reader looks at
-    // when a difference is reported. Decoding it back would compare the codec as well as the
-    // renderer, so the check that matters is that the file exists, is a PNG, and is not empty.
-    let data = try Data(contentsOf: file)
-    #expect(data.count > 1_000)
-    #expect(Array(data.prefix(4)) == [0x89, 0x50, 0x4E, 0x47])
+
+    // Not a raw byte comparison of the two PNG files. A first version of this test tried that and
+    // was wrong twice over: an encoder-level byte match is fragile to any sub-pixel rounding change
+    // that alters nothing anyone would call a regression, and — found only by sampling the process
+    // while it hung — Swift Testing's `#expect(a == b)` on two ~240 KB `Data` values that actually
+    // differ runs its collection-diffing machinery, an O(n·d) edit-distance search that pegs a core
+    // for minutes. Decoding both to pixels and comparing through this project's own `ImageDifference`
+    // — the same instrument and the same tolerance every cross-backend comparison already trusts —
+    // both avoids that hang and answers the question this test exists to ask: does the picture still
+    // match, not does the compressed file still match.
+    guard let storedPixels = decodePNGToPinnedPixels(file) else {
+        Issue.record("could not decode the stored reference at \(file.path)")
+        return
+    }
+    let difference = ImageDifference.between(reference: storedPixels, candidate: pixels)
+    let message = "\(difference.fractionBeyondTolerance) of channel samples differ by more than "
+        + "the tolerance (worst: \(difference.maximumChannelDelta)/255); inspect \(file.path) "
+        + "before regenerating it with WRITE_GOLDENS=1 swift test"
+    #expect(difference.fractionBeyondTolerance == 0, Comment(rawValue: message))
+}
+
+/// Decodes a stored PNG back into the same premultiplied-BGRA, sRGB pixel layout every offscreen
+/// render in this package produces, so it can be compared against one directly.
+///
+/// `interpolationQuality = .none` is not a default worth trusting silently: at anything but exact
+/// 1:1 scale, `CGContext.draw` is free to resample, which would compare the resampler against the
+/// renderer instead of one render against another.
+private func decodePNGToPinnedPixels(_ url: URL) -> [UInt8]? {
+    guard let source = CGImageSourceCreateWithURL(url as CFURL, nil),
+          let image = CGImageSourceCreateImageAtIndex(source, 0, nil)
+    else { return nil }
+    let width = image.width, height = image.height
+    let bytesPerRow = width * 4
+    var pixels = [UInt8](repeating: 0, count: bytesPerRow * height)
+    guard let context = CGContext(
+        data: &pixels, width: width, height: height, bitsPerComponent: 8, bytesPerRow: bytesPerRow,
+        space: PaletteColor.sRGB,
+        bitmapInfo: CGImageAlphaInfo.premultipliedFirst.rawValue | CGBitmapInfo.byteOrder32Little.rawValue
+    ) else { return nil }
+    context.interpolationQuality = .none
+    context.draw(image, in: CGRect(x: 0, y: 0, width: width, height: height))
+    return pixels
 }
 
 /// Each bar must be load-bearing on its own, so each needs a case that only it rejects. Without

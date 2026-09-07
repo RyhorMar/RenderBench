@@ -175,7 +175,8 @@
         "Foundation",
         "Testing",
         "SwiftUI",
-        "CoreGraphics"
+        "CoreGraphics",
+        "ImageIO"
       ],
       "local": [
         "BenchCore",
