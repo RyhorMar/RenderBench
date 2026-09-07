@@ -57,9 +57,14 @@ drifts from the manifest unnoticed.
 
 ## What this does NOT do (yet)
 
-Metal rendering, the other eight backends, downsampling, axes, interaction, accessibility,
-oil & gas chart types, out-of-core data, printing. Each is added only after the previous slice
-builds green and is measured on a device.
+All nine backends draw the one reference chart RC-1, and only four of its fifteen required
+properties — thick smoothed line (partially), min/max downsampling, null gaps, and the categorical
+palette. Not built for any backend: crossover fill, an uncertainty band, a log axis, a second Y
+axis, annotations, a synchronised cursor, zoom/pan, delta-loading into a GPU buffer, accessibility,
+a data-age indicator. Every one of those is added once, across all nine backends at once, rather
+than per backend — see [`Docs/adr/0002-renderer-contract.md`](Docs/adr/0002-renderer-contract.md).
+Oil & gas chart types and out-of-core data are not started. None of it starts before the first
+measurement on a device.
 
 ## Evidence
 
