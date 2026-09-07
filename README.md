@@ -3,24 +3,39 @@
 Nine ways to draw the same realtime chart on iOS, on the same data, with measured frame time
 and a documented failure point for each.
 
-**Status: three backends of nine, and no measurement on a device yet.** Canvas draws a live strip
-chart from a running window, with min/max and LTTB selectable at runtime and an overlay reporting
-frame-time percentiles. Core Animation draws the same frame as a layer tree. Metal uploads the
-points once and expands them into triangles in a vertex shader, and is the only one of the three
-whose rasterisation is measured rather than inferred: a command buffer carries its own timestamps.
+**Status: nine backends of nine, and none measured on a device yet.** Canvas, Core Animation and
+Metal draw through their own device APIs. Swift Charts and Shape + Path are SwiftUI's own retained
+view types. Core Image delivers a CPU-rasterised frame through a GPU filter pipeline. SceneKit puts
+the chart in a 3D scene, deliberately — its one-pixel line primitive cannot express a stroke width,
+and that is a finding, not a bug to work around. A SwiftUI fragment shader recomputes analytic
+coverage per pixel. Metal Compute is the one method whose reduction itself runs on the GPU, not the
+CPU. Every backend's rasterisation is reported when the method can observe it at all — `nil`, never
+a fabricated zero, when it cannot. See [`Docs/adr/0002-renderer-contract.md`](Docs/adr/0002-renderer-contract.md)
+for what nine implementations settled about the shared contract, and what is still open on purpose.
 
-The three agree on what they draw, checked on every test run — but agreement is a weaker claim for
-the first two, which share a rasteriser, than for the third, which does not. See
+Each backend agrees with a Core Graphics reference on the same chart, checked on every test run —
+but agreement means less for the six that share CoreGraphics as their rasteriser than for the three
+that draw through their own pipeline entirely. See
 [`Docs/methods/equivalence.md`](Docs/methods/equivalence.md).
+
+Every method also lives behind its own screen in the demo application, pushed and popped through
+real navigation rather than switched in place — the one place these nine differ more than they do
+in frame time. A screen's GPU-owning renderer is torn down when its route leaves the navigation
+path, not when its view happens to disappear or deallocate: `onDisappear` also fires when a sheet
+merely covers a still-live screen, and `deinit` on iOS can arrive on the next run of `body` rather
+than at the moment a screen is popped. Verified for all nine with a `weak`-reference probe and,
+separately, with a UI test driving real navigation and a real background/foreground cycle — not
+proof that no backend can leak under adversarial timing, which needs a device and Instruments to
+settle and is recorded as open rather than assumed closed.
 
 The central claim of this project — that these methods differ in measurable ways — **is not yet
 supported by a single measurement on hardware.** `Benchmarks/results/` is empty on purpose: the
 guard in `fastlane bench_guard` rejects a run made in a simulator, in Debug, or on a thermally
-throttled device, and no run has been made that passes it. The remaining six backends,
-accessibility and the oil & gas chart types are not written.
+throttled device, and no run has been made that passes it. Accessibility and the oil & gas chart
+types are not written.
 
 ```
-swift test          # the package: 215 tests
+swift test          # the package: 342 tests
 fastlane ci         # package, tests, layering rule, demo build
 fastlane run_demo   # build, install and launch on a booted simulator
 ```
