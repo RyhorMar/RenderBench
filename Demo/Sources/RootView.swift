@@ -13,6 +13,9 @@ struct RootView: View {
                     NavigationLink(value: Route.method(entry.id)) {
                         Text(entry.descriptor.displayName)
                     }
+                    // A `List` row built from `NavigationLink` surfaces to accessibility as a
+                    // button, not a cell — no type says so; `NavigationUITests` is what checks it.
+                    .accessibilityIdentifier(entry.id)
                 }
                 NavigationLink("Compare", value: Route.compare)
             }

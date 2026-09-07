@@ -30,6 +30,11 @@ struct MethodScreen: View {
             Text(displayName)
                 .font(.headline)
                 .frame(maxWidth: .infinity, alignment: .leading)
+                // On the enclosing `VStack` this identifier reached every descendant accessibility
+                // element, `hud.frames` included, and replaced each one's own — confirmed by
+                // dumping the accessibility tree under `NavigationUITests`. Scoped to the title
+                // alone, it still names which screen is showing without touching the HUD's.
+                .accessibilityIdentifier("screen.method.\(rendererID)")
 
             ChartPane(scene: scene)
 
@@ -47,7 +52,6 @@ struct MethodScreen: View {
             .pickerStyle(.segmented)
         }
         .padding(12)
-        .accessibilityIdentifier("screen.method.\(rendererID)")
         .onAppear {
             registry.register(scene, for: rendererID)
             scene.start()

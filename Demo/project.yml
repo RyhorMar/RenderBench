@@ -87,15 +87,31 @@ targets:
         CODE_SIGNING_ALLOWED: NO
         GENERATE_INFOPLIST_FILE: YES
 
+  RenderBenchDemoUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: UITests
+    # Drives the app as a black box through `XCUIApplication()`, launched in its own process — no
+    # package products to link, only the app target it launches and inspects.
+    dependencies:
+      - target: RenderBenchDemo
+    settings:
+      base:
+        CODE_SIGNING_ALLOWED: NO
+        GENERATE_INFOPLIST_FILE: YES
+
 schemes:
   RenderBenchDemo:
     build:
       targets:
         RenderBenchDemo: all
         RenderBenchDemoTests: [test]
+        RenderBenchDemoUITests: [test]
     test:
       targets:
         - RenderBenchDemoTests
+        - RenderBenchDemoUITests
     run:
       config: Debug
     profile:
