@@ -112,3 +112,31 @@ func saturationDefaultsToNeutral() {
     let renderer = CoreImageRenderer()
     #expect(renderer.saturation == CoreImageRenderer.neutralSaturation)
 }
+
+/// The real defect behind B23: every existing fixture in this file uses a `plotRect` that already
+/// matches `ComparisonImage`'s pinned size, so nothing here ever exercised what the live demo
+/// actually sends — a `PreparedFrame` sized to the real, on-screen chart area, which on a phone is
+/// nowhere near 1024×768 points.
+@MainActor
+@Test
+func theRenderedImageMatchesTheFramesOwnSizeNotThePinnedComparisonSize() {
+    // A plausible on-screen chart area, deliberately far from ComparisonImage's 1024×768.
+    let plot = PlotRect(x: 52, y: 10, width: 320, height: 200)
+    var frame = PreparedFrame(plotRect: plot)
+    frame.series = [
+        PreparedSeries(
+            index: 0, colour: Palette.colour(forSeries: 0, dark: false),
+            points: [PlottedPoint(x: 0, y: 0.5, isBreak: false), PlottedPoint(x: 1, y: 0.5, isBreak: false)]
+        ),
+    ]
+    frame.chrome = ChromeLayout.build(plot: plot, xTicks: [], yTicks: [], chrome: .light, scale: 1)
+
+    let renderer = CoreImageRenderer()
+    _ = renderer.encode(frame)
+
+    let expectedWidth = CGFloat(plot.maxX + FramePreparation.rightInset)
+    let expectedHeight = CGFloat(plot.maxY + FramePreparation.bottomInset)
+    let extent = renderer.image?.extent
+    #expect(extent?.width == expectedWidth, "image is \(String(describing: extent)), the frame's own canvas is \(expectedWidth)x\(expectedHeight)")
+    #expect(extent?.height == expectedHeight)
+}

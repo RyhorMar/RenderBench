@@ -18,49 +18,64 @@ public enum CoreGraphicsReference {
     /// invalidate every stored reference image.
     ///
     /// - Parameters:
-    ///   - frame: Geometry to draw, already prepared, background and chrome included. Its
-    ///     `plotRect` must match `ComparisonImage`'s pinned size.
+    ///   - frame: Geometry to draw, already prepared, background and chrome included.
     ///   - scale: Device pixels per point. The reference is produced at 1 by default and the
     ///     screen draws at 2 or 3, so a statement relating this image to a device's rendering
     ///     only holds when both were produced at the same scale. Making it a parameter is what
     ///     lets that be checked rather than assumed.
-    /// - Returns: `ComparisonImage.byteCount(scale:)` bytes, or `nil` when a context could not be
-    ///   created.
-    public static func render(_ frame: PreparedFrame, scale: Double = 1) -> [UInt8]? {
-        makeCanvas(frame, scale: scale)?.pixels()
+    ///   - canvasWidth, canvasHeight: The bitmap's size in points, defaulting to
+    ///     `ComparisonImage`'s pinned size — every equivalence test in this project renders here,
+    ///     and `frame.plotRect` is expected to match it. A caller drawing a *live* frame instead —
+    ///     one whose `plotRect` was built from a real, on-screen size — must pass that size here
+    ///     too, or the geometry ends up correctly drawn but confined to a corner of a canvas sized
+    ///     for a comparison it is not part of. This is not a hypothetical: it is exactly the defect
+    ///     that shipped when ``CoreImageBackend``'s live path first called this function with the
+    ///     defaults, drawing a phone-sized chart into the top-left of a 1024×768 canvas and then
+    ///     asking Core Image to display only the phone-sized region back — nothing, since the
+    ///     chart's own geometry sat outside that region entirely.
+    /// - Returns: `canvasWidth * canvasHeight * 4` bytes at `scale`, or `nil` when a context could
+    ///   not be created.
+    public static func render(
+        _ frame: PreparedFrame, scale: Double = 1,
+        canvasWidth: Int = ComparisonImage.width, canvasHeight: Int = ComparisonImage.height
+    ) -> [UInt8]? {
+        makeCanvas(frame, scale: scale, canvasWidth: canvasWidth, canvasHeight: canvasHeight)?.pixels()
     }
 
-    /// Renders a frame exactly as ``render(_:scale:)`` does, but returns the `CGImage` snapshot of
-    /// the same bitmap context instead of copying its bytes out.
+    /// Renders a frame exactly as ``render(_:scale:canvasWidth:canvasHeight:)`` does, but returns
+    /// the `CGImage` snapshot of the same bitmap context instead of copying its bytes out.
     ///
     /// Exists for a backend — Core Image so far — whose own pipeline starts from a `CGImage`
     /// rather than from raw bytes, and which must be provably drawing the same thing this
     /// reference draws rather than merely something similar. `CGContext.makeImage()` snapshots the
     /// context's own storage with no intervening copy or re-encoding, so the image this returns and
-    /// the bytes ``render(_:scale:)`` returns for the same frame are the same pixels by
+    /// the bytes the sibling function returns for the same frame are the same pixels by
     /// construction, not by two rasterisers agreeing.
     ///
-    /// - Returns: `nil` under the same condition as ``render(_:scale:)``.
-    public static func renderCGImage(_ frame: PreparedFrame, scale: Double = 1) -> CGImage? {
-        guard let canvas = makeCanvas(frame, scale: scale) else { return nil }
+    /// - Returns: `nil` under the same condition as the sibling function.
+    public static func renderCGImage(
+        _ frame: PreparedFrame, scale: Double = 1,
+        canvasWidth: Int = ComparisonImage.width, canvasHeight: Int = ComparisonImage.height
+    ) -> CGImage? {
+        guard let canvas = makeCanvas(frame, scale: scale, canvasWidth: canvasWidth, canvasHeight: canvasHeight)
+        else { return nil }
         return canvas.context.makeImage()
     }
 
     /// Draws a frame into a freshly allocated ``BitmapCanvas`` and returns it, still holding the
-    /// drawn context. Shared by ``render(_:scale:)`` and ``renderCGImage(_:scale:)`` so the two
-    /// can never draw anything differently from one another.
-    private static func makeCanvas(_ frame: PreparedFrame, scale: Double) -> BitmapCanvas? {
-        let pixelWidth = Int((Double(ComparisonImage.width) * scale).rounded())
-        let pixelHeight = Int((Double(ComparisonImage.height) * scale).rounded())
+    /// drawn context. Shared by both public entry points so the two can never draw anything
+    /// differently from one another.
+    private static func makeCanvas(
+        _ frame: PreparedFrame, scale: Double, canvasWidth: Int, canvasHeight: Int
+    ) -> BitmapCanvas? {
+        let pixelWidth = Int((Double(canvasWidth) * scale).rounded())
+        let pixelHeight = Int((Double(canvasHeight) * scale).rounded())
         guard let canvas = BitmapCanvas(width: pixelWidth, height: pixelHeight) else { return nil }
         let context = canvas.context
         context.scaleBy(x: CGFloat(scale), y: CGFloat(scale))
 
         context.setFillColor(frame.chrome.background.cgColor)
-        context.fill(CGRect(
-            x: 0, y: 0,
-            width: CGFloat(ComparisonImage.width), height: CGFloat(ComparisonImage.height)
-        ))
+        context.fill(CGRect(x: 0, y: 0, width: CGFloat(canvasWidth), height: CGFloat(canvasHeight)))
 
         let plot = frame.plotRect
         if plot.isDrawable {

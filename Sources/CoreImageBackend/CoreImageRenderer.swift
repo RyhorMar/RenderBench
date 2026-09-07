@@ -86,10 +86,24 @@ public final class CoreImageRenderer: ChartRenderer {
         guard !tornDown else { return EncodeReport(encodeNs: 0, pointsDrawn: nil, drawCalls: nil) }
         defer { encodedRevision += 1 }
 
+        // `CoreGraphicsReference` defaults to `ComparisonImage`'s pinned canvas, sized for the
+        // offscreen equivalence check. A live frame's `plotRect` is sized to the real, on-screen
+        // chart instead — reconstructed here from the plot rect plus the shared insets, the same
+        // arithmetic `FramePreparation.prepare` ran in reverse when it built `plotRect` from a
+        // caller's `size`. Rendering at the pinned size regardless drew a correctly shaped chart
+        // confined to a small corner of a 1024×768 canvas built for a different comparison, while
+        // `CoreImageChartSurface` asked Core Image to fill the real, much smaller drawable from
+        // that same image — the mismatch this backend's live path shipped with, caught only once a
+        // test built a `PreparedFrame` at a realistic on-screen size instead of the pinned one.
+        let canvasWidth = Int((prepared.plotRect.maxX + FramePreparation.rightInset).rounded())
+        let canvasHeight = Int((prepared.plotRect.maxY + FramePreparation.bottomInset).rounded())
+
         let clock = ContinuousClock()
         var built: CIImage?
         let elapsed = clock.measure {
-            guard let cgImage = CoreGraphicsReference.renderCGImage(prepared, scale: prepared.scale) else { return }
+            guard let cgImage = CoreGraphicsReference.renderCGImage(
+                prepared, scale: prepared.scale, canvasWidth: canvasWidth, canvasHeight: canvasHeight
+            ) else { return }
             let filter = CIFilter.colorControls()
             filter.inputImage = CIImage(cgImage: cgImage)
             filter.saturation = Float(saturation)
