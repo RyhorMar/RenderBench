@@ -61,10 +61,9 @@ func eachVariantHoldsEightDistinctColours() {
     }
 }
 
-/// Separation in linear space. This does **not** demonstrate the palette's actual claim — that the
-/// colours stay distinguishable under colour vision deficiency — which needs Machado's simulation
-/// and CIEDE2000 and is not implemented. It catches the failure this test can catch: colours that
-/// collapsed towards each other or towards one hue.
+/// Separation in linear space, which is a weaker property than separability under colour vision
+/// deficiency — the one the series set was once claimed to have and, measured, does not. This
+/// catches the failure it can catch: colours that collapsed towards each other or towards one hue.
 @Test
 func noTwoColoursAreNearlyIdenticalInLinearSpace() {
     func distance(_ a: PaletteColor, _ b: PaletteColor) -> Double {
@@ -133,4 +132,39 @@ func encodingRoundTripsThroughEveryLevel() {
 func encodingClampsRatherThanProducingNonsense() {
     #expect(PaletteColor.encode(-1) == 0)
     #expect(abs(PaletteColor.encode(2) - 1) < 1e-12)
+}
+
+/// The three family colours, written out here as literals rather than read back from the palette.
+/// They are a measured result — the trio was chosen because no pair of them collapses under
+/// simulated colour vision deficiency — so a channel that drifts silently is a set whose
+/// measurement no longer describes it.
+@Test
+func familyColoursHoldThePublishedTriple() {
+    #expect(Palette.colour(for: .sharedRasteriser) == PaletteColor(srgb: 0xEE, 0x14, 0x01))
+    #expect(Palette.colour(for: .ownPipeline) == PaletteColor(srgb: 0x04, 0x98, 0x63))
+    #expect(Palette.colour(for: .hybrid) == PaletteColor(srgb: 0x6D, 0x65, 0xFE))
+}
+
+/// One colour per family, and three families. The mutation that gave two families the same colour
+/// would leave a chart that still renders and a legend that no longer separates anything.
+@Test
+func everyFamilyHasItsOwnColour() {
+    let colours = RasteriserFamily.allCases.map { Palette.colour(for: $0) }
+    #expect(colours.count == 3)
+    #expect(Set(colours).count == 3)
+}
+
+/// Equal lightness across the three, so that no family reads as more important than another. What
+/// lets one set serve both themes is contrast against every surface, which is measured elsewhere and
+/// not this. Relative luminance by the standard's weights, computed here rather than taken from the
+/// palette, so a channel edited towards a lighter or darker family fails even if the set stays
+/// distinguishable.
+@Test
+func theThreeFamiliesSitAtTheSameLightness() {
+    func relativeLuminance(_ colour: PaletteColor) -> Double {
+        0.2126 * colour.red + 0.7152 * colour.green + 0.0722 * colour.blue
+    }
+    let luminances = RasteriserFamily.allCases.map { relativeLuminance(Palette.colour(for: $0)) }
+    let spread = luminances.max()! - luminances.min()!
+    #expect(spread < 0.06, "lightness spread is \(spread)")
 }

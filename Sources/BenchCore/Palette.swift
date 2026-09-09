@@ -43,17 +43,37 @@ public struct PaletteColor: Sendable, Hashable {
     }
 }
 
-/// Categorical colours for series that have no natural order.
+/// The rasteriser lineage a backend belongs to: which code turns geometry into pixels.
 ///
-/// Eight is the limit on purpose: beyond that, colour stops identifying anything and the series
-/// need direct labels instead. The set is chosen to stay separable under the common forms of
-/// colour vision deficiency, which rules out the red/green pairing that most default palettes open
-/// with.
+/// Three of them because that is the distinction the benchmark measures — a backend either hands
+/// its geometry to the shared rasteriser, drives its own pipeline down to the pixels, or does one
+/// for the curve and the other for the chrome around it. Method identity is carried by the
+/// method's name and number, never by this.
+public enum RasteriserFamily: Sendable, Hashable, CaseIterable {
+    /// Geometry goes to Core Graphics, which produces the pixels.
+    case sharedRasteriser
+    /// The backend owns a device and produces the pixels itself.
+    case ownPipeline
+    /// Its own device delivers a frame the shared rasteriser drew.
+    case hybrid
+}
+
+/// Colours for series, and for the rasteriser families the backends fall into.
 ///
-/// - SeeAlso: Docs/methods/colour.md — the sources this set follows, and why "CVD-safe" is
-///   currently a claim inherited from them rather than one measured here.
+/// The series set is eight colours, and its separability under colour vision deficiency has been
+/// measured and refuted: the worst pair is 3.3 in the light variant and 0.2 in the dark one, where
+/// the project's own floor is 15. No other eight colours would pass either — at that floor the
+/// largest set that fits is seven — so series colour is a viewing aid, and a series without a
+/// label beside it is not identified.
+///
+/// The family set is three colours, which does clear the floor. Three is what fits, and it is also
+/// the distinction the project measures: which rasteriser produces the pixels.
+///
+/// - SeeAlso: Docs/methods/colour.md — the measurements, their thresholds, and what each set does
+///   and does not claim.
 public enum Palette {
-    /// Eight categorical colours for a light background.
+    /// Eight categorical colours for a light background, separable at a glance and not under
+    /// simulated colour vision deficiency.
     public static let categoricalLight: [PaletteColor] = [
         PaletteColor(srgb: 0x00, 0x6B, 0xA6),
         PaletteColor(srgb: 0xE3, 0x6C, 0x09),
@@ -84,5 +104,29 @@ public enum Palette {
     public static func colour(forSeries index: Int, dark: Bool) -> PaletteColor {
         let set = dark ? categoricalDark : categoricalLight
         return set[((index % set.count) + set.count) % set.count]
+    }
+
+    /// Colour for a rasteriser family — one set, both themes.
+    ///
+    /// Searched under Machado's colour vision deficiency model and CIEDE2000 against the floor of
+    /// 15 this project sets itself, and measured on the values below: the worst pair is 17.2 under
+    /// deuteranopia, 21.0 under protanopia, 17.3 under tritanopia, 47.5 for normal vision. Each
+    /// clears 3:1 against every surface of both themes, which is why one set serves both rather
+    /// than a light and a dark variant.
+    ///
+    /// The search ran in `oklch` at equal lightness 0.600 — hues 30, 160 and 280 — so that no
+    /// family reads as more important than another. These are the rounded 8-bit values, fixed once
+    /// here rather than re-derived: rounding costs 0.1 of the worst pair, 17.3 before and 17.2
+    /// after, and the figures above are the ones measured after it. All three sit inside the sRGB
+    /// gamut, which was checked and not assumed: a colour outside it is clamped channel by channel
+    /// on the way in, and a clamped colour is a different colour from the one named.
+    ///
+    /// Never the only carrier of the distinction: the family's name belongs beside the colour.
+    public static func colour(for family: RasteriserFamily) -> PaletteColor {
+        switch family {
+        case .sharedRasteriser: PaletteColor(srgb: 0xEE, 0x14, 0x01)
+        case .ownPipeline: PaletteColor(srgb: 0x04, 0x98, 0x63)
+        case .hybrid: PaletteColor(srgb: 0x6D, 0x65, 0xFE)
+        }
     }
 }

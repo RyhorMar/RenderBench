@@ -14,7 +14,7 @@ what each one costs and where each one lies.
 | [Randomness and signals](randomness-and-signals.md) | SplitMix64, Box–Muller, signal models | yes |
 | [Buffers and windows](buffers-and-windows.md) | mirrored ring buffer, gap runs, carrier search | partly |
 | [Frame pipeline](frame-pipeline.md) | one clock per scene, one-deep slot, epochs | no |
-| [Colour](colour.md) | linear sRGB, categorical palette | yes |
+| [Colour](colour.md) | linear sRGB, categorical series set, three family colours | yes |
 | [GPU line expansion](gpu-lines.md) | instanced quads, 4x multisampling, GPU timestamps | no |
 | [Equivalence](equivalence.md) | per-channel difference, PSNR, offscreen reference | no |
 | [Declarative chart](declarative-chart.md) | Swift Charts `LineMark`, run-splitting at breaks | no |
