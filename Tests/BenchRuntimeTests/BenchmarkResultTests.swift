@@ -30,7 +30,14 @@ private let validCase = """
 }
 """
 
-private func json(run: String = validRun, env: String = validEnv, cases: String = validCase) -> Data {
+/// The same case in the three repeats the procedure requires — the shape a stored file has to
+/// have. A single pass is a valid document and not a measurement, which is what
+/// `tooFewRepeats` exists to say, so the fixture that stands in for a real file carries three.
+private let threeRepeats = (1...3)
+    .map { validCase.replacingOccurrences(of: "\"repeatIndex\": 1", with: "\"repeatIndex\": \($0)") }
+    .joined(separator: ",")
+
+private func json(run: String = validRun, env: String = validEnv, cases: String = threeRepeats) -> Data {
     Data("""
     {"run": \(run), "env": \(env), "cases": [\(cases)]}
     """.utf8)
@@ -45,7 +52,7 @@ func aCompleteResultDecodes() throws {
     let result = try decode(json())
     #expect(result.run.gitSha == "deadbeef")
     #expect(result.env.deviceModel == "iPhone17,1")
-    #expect(result.cases.count == 1)
+    #expect(result.cases.count == 3)
     #expect(throws: Never.self) { try result.validate(isStoredResult: true) }
 }
 
@@ -230,7 +237,7 @@ func theHardwareIdentifierSaysWhenItIsPretending() {
 /// absence: a decoder that turned it into a zero would publish "drew nothing" as a measurement.
 @Test
 func anAbsentCounterDecodesAsNilRatherThanZero() throws {
-    let withoutCounters = validCase
+    let withoutCounters = threeRepeats
         .replacingOccurrences(of: "\"pointsDrawn\": 2512, ", with: "")
         .replacingOccurrences(of: "\"drawCalls\": 8,", with: "")
     let result = try decode(json(cases: withoutCounters))
@@ -302,4 +309,51 @@ func aZeroCounterIsRejectedInAnUnstoredResultAsWell() throws {
     let zeroed = validCase.replacingOccurrences(of: "\"drawCalls\": 8", with: "\"drawCalls\": 0")
     let result = try decode(json(cases: zeroed))
     #expect(throws: (any Error).self) { try result.validate(isStoredResult: false) }
+}
+
+// MARK: A correctly shaped file that is not a measurement
+
+/// The file the application's export button writes, on a device, in Release, with nothing wrong
+/// with it — and it is still refused.
+///
+/// Every field in it is honest: the export performs no warm-up and it says `0`, and it is one
+/// pass and it says `1`. Honest and "not a measurement" are compatible, which is why the
+/// directory that holds evidence checks these two rather than trusting the shape of the document.
+private let exportShapedCase = validCase
+    .replacingOccurrences(of: "\"warmupFrames\": 120", with: "\"warmupFrames\": 0")
+
+@Test
+func aFileWithNoWarmUpIsRefusedFromTheResultsDirectory() throws {
+    let threeUnwarmed = (1...3)
+        .map { exportShapedCase.replacingOccurrences(of: "\"repeatIndex\": 1", with: "\"repeatIndex\": \($0)") }
+        .joined(separator: ",")
+    let result = try decode(json(cases: threeUnwarmed))
+    #expect(throws: BenchmarkValidationError.notWarmedUp(backend: "canvas")) {
+        try result.validate(isStoredResult: true)
+    }
+}
+
+@Test
+func aSinglePassIsRefusedFromTheResultsDirectory() throws {
+    let result = try decode(json(cases: validCase))
+    #expect(throws: BenchmarkValidationError.tooFewRepeats(found: 1, required: 3)) {
+        try result.validate(isStoredResult: true)
+    }
+}
+
+/// The whole of what the export button produces, refused at the first of the two.
+@Test
+func theExportButtonsOwnFileIsRefused() throws {
+    let result = try decode(json(cases: exportShapedCase))
+    #expect(throws: (any Error).self) { try result.validate(isStoredResult: true) }
+    // And still a valid document: the format is not what is wrong with it.
+    #expect(throws: Never.self) { try result.validate(isStoredResult: false) }
+}
+
+/// Neither rule reaches outside the results directory. The example has one repeat by design, and
+/// a file being read rather than filed is not being offered as evidence.
+@Test
+func neitherRuleAppliesOutsideTheResultsDirectory() throws {
+    let result = try decode(json(cases: exportShapedCase))
+    #expect(throws: Never.self) { try result.validate(isStoredResult: false) }
 }

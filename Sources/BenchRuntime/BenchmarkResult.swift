@@ -17,6 +17,8 @@ public enum BenchmarkValidationError: Error, Equatable, CustomStringConvertible 
     case equivalenceFailed(backend: String)
     case noCases
     case counterReportedAsZero(field: String, backend: String)
+    case notWarmedUp(backend: String)
+    case tooFewRepeats(found: Int, required: Int)
 
     public var description: String {
         switch self {
@@ -40,6 +42,14 @@ public enum BenchmarkValidationError: Error, Equatable, CustomStringConvertible 
             "contains no cases, so it measures nothing"
         case .counterReportedAsZero(let field, let backend):
             "\(backend) reported \(field) as 0; a counter a backend cannot know is absent, never zero"
+        case .notWarmedUp(let backend):
+            """
+            \(backend) discarded no warm-up frames, so its first frames — allocation, the first             texture upload, a cold cache — are among the ones measured
+            """
+        case .tooFewRepeats(let found, let required):
+            """
+            \(found) of the \(required) repeats the procedure requires; a single pass cannot             separate a difference between backends from the order they ran in
+            """
         }
     }
 }
@@ -353,7 +363,23 @@ public struct BenchmarkResult: Codable, Sendable, Equatable {
         if let level = env.batteryLevel, level < Self.minimumBatteryLevel {
             throw .batteryTooLow(level)
         }
+
+        // The two fields that separate a measurement from a button press. The application can
+        // write a correctly shaped file from whatever is on screen — it says so in its own
+        // documentation — and every field in such a file is honest: `warmupFrames` really is 0 and
+        // there really is one repeat. Honest and not a measurement are compatible, so the
+        // directory that holds evidence checks these rather than trusting the shape.
+        for element in cases where element.warmupFrames < 1 {
+            throw .notWarmedUp(backend: element.backend)
+        }
+        let repeats = Set(cases.map(\.repeatIndex)).count
+        guard repeats >= Self.requiredRepeats else {
+            throw .tooFewRepeats(found: repeats, required: Self.requiredRepeats)
+        }
     }
+
+    /// Repeats the procedure requires, each in its own process.
+    public static let requiredRepeats = 3
 
     /// Battery floor the procedure requires. Below it the system begins making its own decisions
     /// about clocks, and the run measures those instead.

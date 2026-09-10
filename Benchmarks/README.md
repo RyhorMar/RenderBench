@@ -37,8 +37,15 @@ document, because it reads as a guarantee.
 
 Checked by `bench-guard` on every stored file: not a simulator, Release configuration, thermal state
 below serious at **both** ends of the run, Low Power Mode off, battery at or above 40 % when the
-platform reports one, and no case whose equivalence check failed. The rest are the runner's to
-enforce, because only it is present while the run happens:
+platform reports one, and no case whose equivalence check failed.
+
+Two more, and they are there because a correctly shaped file is not the same thing as a
+measurement. The application can write one from whatever happens to be on screen — a button, no
+warm-up, one pass — and every field in it is honest: `warmupFrames` really is 0, and there really
+is one repeat. So a stored file must also discard warm-up frames in every case and contain all
+three repeats. Neither rule reaches outside `results/`: `example.json` has one repeat by design.
+
+The rest are the runner's to enforce, because only it is present while the run happens:
 
 - not a simulator;
 - Release configuration — a Debug run measures the compiler's bookkeeping;
