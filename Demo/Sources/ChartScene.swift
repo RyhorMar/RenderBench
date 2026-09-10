@@ -277,7 +277,7 @@ final class ChartScene {
             window: plan.window,
             yDomain: yDomain,
             size: (width: Double(chartSize.width), height: Double(chartSize.height)),
-            chrome: .forScheme(dark: isDark),
+            chrome: AppChrome.chart(dark: isDark),
             scale: displayScale,
             dark: isDark,
             measuring: ApproximateTextWidth(),

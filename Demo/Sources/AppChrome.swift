@@ -1,4 +1,7 @@
+import BenchCore
+import BenchRuntime
 import SwiftUI
+import UIKit
 
 /// The app's chrome colours, one name per role rather than one per hex.
 ///
@@ -47,4 +50,42 @@ enum AppChrome {
     /// Measured cost against the colour as named: ΔE2000 3.7 for light, 0.24 for dark. Contrast
     /// against the surfaces of its own theme: 4.71:1 light, 7.71:1 dark.
     static let accent = Color(.accent)
+
+    /// The chart's furniture in the app's own colours.
+    ///
+    /// Without this the app carried two independent definitions of a surface: the package's default
+    /// chrome grounds a chart at `#FCFCFC` / `#1C1C1E`, the app's card is `#FFFFFF` / `#151920`, and
+    /// in the dark theme those are ΔE2000 3.77 apart — a visible step, so the chart read as a grey
+    /// rectangle pasted onto a blue-grey card.
+    ///
+    /// Mapped by role rather than by eye: the ground is the card the chart sits in, the grid is the
+    /// same hairline the app draws elsewhere, the axes take the muted label colour and the axis
+    /// labels the readable one. Measured against the card: grid 1.38:1 light and 1.28:1 dark, which
+    /// is decorative on purpose; axes 4.62 and 4.78 against a 3:1 floor for non-text; labels 9.29 and
+    /// 8.24 against a 4.5:1 floor for text.
+    ///
+    /// The package keeps its own defaults. They are what the offscreen reference renders with, and
+    /// changing them would invalidate a stored golden image for no gain — the chart in the app is
+    /// what has to match the app.
+    static func chart(dark: Bool) -> ChartChrome {
+        ChartChrome(
+            background: palette(.card, dark: dark),
+            grid: palette(.border, dark: dark),
+            axis: palette(.sub, dark: dark),
+            label: palette(.sub2, dark: dark)
+        )
+    }
+
+    /// An asset colour as the core's own colour type.
+    ///
+    /// Through 8-bit components deliberately: the catalogue stores each value as an 8-bit sRGB
+    /// triple, so this round-trips exactly rather than carrying a float that only looks more precise.
+    private static func palette(_ resource: ColorResource, dark: Bool) -> PaletteColor {
+        let resolved = UIColor(resource: resource)
+            .resolvedColor(with: UITraitCollection(userInterfaceStyle: dark ? .dark : .light))
+        var red: CGFloat = 0, green: CGFloat = 0, blue: CGFloat = 0, alpha: CGFloat = 0
+        resolved.getRed(&red, green: &green, blue: &blue, alpha: &alpha)
+        func byte(_ component: CGFloat) -> Int { Int((component * 255).rounded()) }
+        return PaletteColor(srgb: byte(red), byte(green), byte(blue))
+    }
 }
