@@ -47,9 +47,13 @@ enforce, because only it is present while the run happens:
 - battery above 40 %;
 - debugger detached;
 - aeroplane mode, fixed brightness, auto-lock off;
-- for a 120 Hz run: `maximumFramesPerSecond == 120` **and** `CADisableMinimumFrameDuration` in the
-  Info.plist. Without the second, the display link is capped at 60 and every "120 Hz" number in the
-  file is a 60 Hz number.
+- for a 120 Hz run: `maximumFramesPerSecond == 120`, `CADisableMinimumFrameDurationOnPhone` in the
+  Info.plist, **and** an explicit `preferredFrameRateRange` on the display link. Any one of the
+  three missing caps the link at 60, and every "120 Hz" number in the file is then a 60 Hz number.
+  This is not hypothetical: the app shipped with the key misspelled — the trailing `OnPhone` is
+  part of it, and an unrecognised key is ignored in silence — and ran at 60 Hz for its whole life
+  before a device measured it. `maximumFramesPerSecond` does not catch that on its own: it reports
+  what the display can do, not what the app is getting.
 
 ## What is published, and what is refused
 
