@@ -329,7 +329,11 @@ public struct BenchmarkResult: Codable, Sendable, Equatable {
             if element.drawCalls == 0 {
                 throw .counterReportedAsZero(field: "drawCalls", backend: element.backend)
             }
-            if element.pointsDrawn == 0, element.pointsSubmitted > 0 {
+            // Unconditional, like the check above it. The earlier form spared a case that had
+            // submitted nothing, which let a zero through the one door the schema keeps shut for
+            // every value: `pointsDrawn` has `minimum: 1` there, whatever `pointsSubmitted` is. A
+            // run that drew nothing has no count to report, and absence is how this format says so.
+            if element.pointsDrawn == 0 {
                 throw .counterReportedAsZero(field: "pointsDrawn", backend: element.backend)
             }
         }

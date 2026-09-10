@@ -280,6 +280,21 @@ func drawingNoneOfTheSubmittedPointsIsRejected() throws {
     }
 }
 
+/// The gap the first version of this rule left: it spared a case that had submitted nothing, so a
+/// zero could still be published as long as `pointsSubmitted` was zero too. The schema never allowed
+/// it — `pointsDrawn` has `minimum: 1` regardless — and the two gates disagreeing is worse than
+/// either being strict.
+@Test
+func aZeroIsRejectedEvenWhenNothingWasSubmitted() throws {
+    let emptied = validCase
+        .replacingOccurrences(of: "\"pointsSubmitted\": 2512", with: "\"pointsSubmitted\": 0")
+        .replacingOccurrences(of: "\"pointsDrawn\": 2512", with: "\"pointsDrawn\": 0")
+    let result = try decode(json(cases: emptied))
+    #expect(throws: BenchmarkValidationError.counterReportedAsZero(field: "pointsDrawn", backend: "canvas")) {
+        try result.validate(isStoredResult: true)
+    }
+}
+
 /// The zero rule applies to the example too, not only to stored results: the example is the shape
 /// a reader copies.
 @Test
