@@ -28,11 +28,14 @@ separately, with a UI test driving real navigation and a real background/foregro
 proof that no backend can leak under adversarial timing, which needs a device and Instruments to
 settle and is recorded as open rather than assumed closed.
 
-The central claim of this project — that these methods differ in measurable ways — **is not yet
-supported by a single measurement on hardware.** `Benchmarks/results/` is empty on purpose: the
-guard in `fastlane bench_guard` rejects a run made in a simulator, in Debug, or on a thermally
-throttled device, and no run has been made that passes it. Accessibility and the oil & gas chart
-types are not written.
+The central claim of this project — that these methods differ in measurable ways — **rests on one
+run, on one device.** `Benchmarks/results/` holds it: nine backends, three repeats each in its own
+process, on an iPhone 16 Pro in Release, with the order randomised and the thermal state nominal at
+both ends. What that run does not license is worth as much as what it shows. No confidence
+intervals are computed, so it supports "these figures were recorded" and not "this backend is
+faster than that one". Every case records `notChecked` for equivalence, so no two backends have
+been shown to draw the same picture — and timings are not comparable before the pictures are.
+Accessibility and the oil & gas chart types are not written.
 
 ```
 swift test          # the package's own tests
