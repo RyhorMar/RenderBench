@@ -95,6 +95,65 @@ enum ResultExport {
         }
     }
 
+    /// One measured case, as the runner files it.
+    ///
+    /// Distinct from ``result(from:)`` above in the two fields that say whether the numbers mean
+    /// anything: a real warm-up count and the repeat this case belongs to. `bench-guard` reads
+    /// exactly those two to tell a measurement from a button press.
+    static func measuredCase(from scene: ChartScene, warmupFrames: Int,
+                             repeatIndex: Int) -> BenchmarkCase? {
+        guard let cpu = scene.statistics else { return nil }
+        return BenchmarkCase(
+            chartKind: .stripChart,
+            backend: type(of: scene.renderer).descriptor.identifier,
+            seriesCount: scene.seriesCount,
+            pointsPerSeries: scene.pointsPerSeries,
+            refreshHz: Int(scene.observedHz.rounded()),
+            policy: scene.policy,
+            warmupFrames: warmupFrames,
+            measuredFrames: cpu.sampleCount,
+            repeatIndex: repeatIndex,
+            cpu: cpu,
+            gpu: scene.gpuStatistics,
+            missedDeadlineRatio: nil,
+            pointsSubmitted: scene.pointsSubmitted,
+            pointsDrawn: scene.pointsDrawn,
+            drawCalls: scene.drawCalls,
+            equivalence: .notChecked
+        )
+    }
+
+    /// A finished plan as one file: one run identity, one environment, every case of every repeat.
+    static func result(from plan: RunPlan, endingThermalState: ThermalState) -> BenchmarkResult {
+        let screen = UIApplication.shared.connectedScenes
+            .compactMap { ($0 as? UIWindowScene)?.screen }
+            .first
+        UIDevice.current.isBatteryMonitoringEnabled = true
+        let battery = UIDevice.current.batteryLevel
+        return BenchmarkResult(
+            run: RunMetadata(
+                id: plan.id,
+                startedAt: plan.startedAt,
+                gitSha: BuildInfo.gitSha,
+                gitDirty: BuildInfo.gitDirty,
+                configuration: isDebugBuild ? .debug : .release,
+                swiftVersion: BuildInfo.swiftVersion,
+                xcodeVersion: BuildInfo.xcodeVersion
+            ),
+            env: RunEnvironment(
+                deviceModel: RunEnvironment.hardwareIdentifier(),
+                osVersion: ProcessInfo.processInfo.operatingSystemVersionString,
+                isSimulator: RunEnvironment.isRunningOnSimulator,
+                maximumFramesPerSecond: screen?.maximumFramesPerSecond ?? 60,
+                thermalStateAtStart: plan.thermalStateAtStart,
+                thermalStateAtEnd: endingThermalState,
+                lowPowerModeEnabled: ProcessInfo.processInfo.isLowPowerModeEnabled,
+                batteryLevel: battery >= 0 ? Double(battery) : nil
+            ),
+            cases: plan.cases
+        )
+    }
+
     private static var isDebugBuild: Bool {
         #if DEBUG
         return true

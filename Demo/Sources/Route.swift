@@ -7,9 +7,10 @@ enum Route: Hashable, Codable {
     case method(String)
     /// The multi-backend comparison screen.
     case compare
+    /// The screen that takes a measurement.
+    case measure
 
-    /// The catalogue id this route names, or `nil` for `.compare`, which owns no registered
-    /// scene. `RootView` diffs `path` through this to know which scene left the stack.
+    /// The catalogue id this route names, or `nil` for the routes that own no registered scene. `RootView` diffs `path` through this to know which scene left the stack.
     var methodID: String? {
         if case .method(let id) = self { return id }
         return nil

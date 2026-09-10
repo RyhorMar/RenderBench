@@ -18,6 +18,7 @@ struct RootView: View {
                     .accessibilityIdentifier(entry.id)
                 }
                 NavigationLink("Compare", value: Route.compare)
+                NavigationLink("Measure", value: Route.measure)
             }
             .navigationTitle("RenderBench")
             // Attached to the List's content, not inside the ForEach that builds its rows: a
@@ -30,6 +31,8 @@ struct RootView: View {
                     MethodScreen(rendererID: id, registry: registry)
                 case .compare:
                     CompareScreen()
+                case .measure:
+                    RunScreen()
                 }
             }
         }

@@ -151,6 +151,27 @@ final class ChartScene {
         renderer.suspend()
     }
 
+    /// Called once for every frame this scene actually draws.
+    ///
+    /// The benchmark runner counts frames rather than seconds, and this is where it counts them:
+    /// a backend managing nine frames a second and one managing a hundred and twenty have to
+    /// contribute the same number of samples, or the slow one's percentiles are built from a tenth
+    /// of the evidence.
+    var onFrame: (() -> Void)?
+
+    /// Throws away everything measured so far without touching the backend or the data.
+    ///
+    /// This is the end of a warm-up: the frames that paid for allocation and the first texture
+    /// upload are discarded, and the percentiles that follow describe the drawing. Distinct from
+    /// ``switchRenderer(to:)``, which also clears the metrics but does so because they described a
+    /// backend that is no longer here.
+    func resetMetrics() {
+        metrics.removeAll()
+        statistics = nil
+        rasterStatistics = nil
+        gpuStatistics = nil
+    }
+
     /// Replaces the active backend without touching the data feeding it.
     ///
     /// The provider, the pipeline and the accumulated series survive: only the renderer — and the
@@ -306,6 +327,7 @@ final class ChartScene {
         failures = prepared.failures
         framesDrawn &+= 1
         droppedFrames = pipeline.counters.dropped
+        onFrame?()
         if framesDrawn % 10 == 0 {
             statistics = metrics.cpuStatistics()
             rasterStatistics = metrics.rasterStatistics()
