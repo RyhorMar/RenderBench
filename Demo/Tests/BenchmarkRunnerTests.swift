@@ -231,3 +231,45 @@ func aHalfFinishedRepeatIsDiscardedOnResume() {
     #expect(cases.count == 2, "expected both backends measured in this process, got \(cases.count)")
     #expect(cases.allSatisfy { $0.cpu.p50Ns != 1 }, "a case from the dead process survived")
 }
+
+/// The recorded refresh rate is the display's, not whatever the scene last saw between two ticks.
+///
+/// `ChartScene.observedHz` is one tick pair wide. A backend that cannot keep up reports whichever
+/// gap the reader happened to catch — 120 as readily as 11 — and this field says what rate the
+/// frames were being asked for. Driven here at 40 frames a second on a machine whose display says
+/// 120, so the two cannot be confused with each other.
+@MainActor
+@Test
+func theRecordedRefreshRateIsTheDisplaysNotTheOneJustObserved() {
+    let ticker = ManualTicker()
+    let scene = makeScene(ticker)
+    let storage = MemoryRunStorage()
+    let runner = BenchmarkRunner(scene: scene, storage: storage, conditions: { goodMachine })
+    scene.onFrame = { [weak runner] in runner?.frameDrawn() }
+
+    var plan = RunPlan.make(
+        id: "t", seed: 1, backends: ["canvas"], repeats: 1,
+        startedAt: Date(), thermalStateAtStart: .nominal,
+        warmupFrames: 2, measuredFrames: 30, cooldownSeconds: 1
+    )
+    plan.repeatIndex = 1
+    storage.plan = plan
+    runner.resume()
+
+    var time = 0.0
+    for _ in 0..<2_000 {
+        switch runner.phase {
+        case .warmup, .measuring:
+            time += 1.0 / 40
+            ticker.fire(at: time)
+        case .cooling:
+            runner.secondElapsed()
+        default:
+            break
+        }
+        if case .wrote = runner.phase { break }
+    }
+
+    #expect(Int(scene.observedHz.rounded()) == 40, "the scene saw \(scene.observedHz)")
+    #expect(storage.written.first?.cases.first?.refreshHz == 120)
+}

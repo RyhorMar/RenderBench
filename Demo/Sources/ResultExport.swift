@@ -100,7 +100,12 @@ enum ResultExport {
     /// Distinct from ``result(from:)`` above in the two fields that say whether the numbers mean
     /// anything: a real warm-up count and the repeat this case belongs to. `bench-guard` reads
     /// exactly those two to tell a measurement from a button press.
-    static func measuredCase(from scene: ChartScene, warmupFrames: Int,
+    /// - Parameter refreshHz: The display's rate, passed in rather than read off the scene.
+    ///   `ChartScene.observedHz` is instantaneous — one tick pair, no window — so a backend
+    ///   sustaining 73 frames a second reports 120 as readily as 11, and this field means "the
+    ///   rate the frames were being asked for". The rate actually achieved is a different
+    ///   quantity, and this format has no field for it.
+    static func measuredCase(from scene: ChartScene, refreshHz: Int, warmupFrames: Int,
                              repeatIndex: Int) -> BenchmarkCase? {
         guard let cpu = scene.statistics else { return nil }
         return BenchmarkCase(
@@ -108,7 +113,7 @@ enum ResultExport {
             backend: type(of: scene.renderer).descriptor.identifier,
             seriesCount: scene.seriesCount,
             pointsPerSeries: scene.pointsPerSeries,
-            refreshHz: Int(scene.observedHz.rounded()),
+            refreshHz: refreshHz,
             policy: scene.policy,
             warmupFrames: warmupFrames,
             measuredFrames: cpu.sampleCount,

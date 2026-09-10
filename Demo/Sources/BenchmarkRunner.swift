@@ -144,6 +144,7 @@ final class BenchmarkRunner {
     private func finish(_ backend: String) {
         guard var current = plan, let measured = ResultExport.measuredCase(
             from: scene,
+            refreshHz: conditions().displayMaximumFramesPerSecond,
             warmupFrames: current.warmupFrames,
             repeatIndex: current.repeatIndex
         ) else {
