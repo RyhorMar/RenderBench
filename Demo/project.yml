@@ -7,7 +7,7 @@
 name: RenderBenchDemo
 
 options:
-  bundleIdPrefix: dev.renderbench
+  bundleIdPrefix: com.ryhormar
   deploymentTarget:
     iOS: "26.0"
   createIntermediateGroups: true
@@ -38,9 +38,12 @@ targets:
     settings:
       base:
         INFOPLIST_FILE: Info.plist
-        PRODUCT_BUNDLE_IDENTIFIER: dev.renderbench.demo
+        PRODUCT_BUNDLE_IDENTIFIER: com.ryhormar.renderbench
         PRODUCT_NAME: RenderBenchDemo
         TARGETED_DEVICE_FAMILY: "1,2"
+        # Signing stays off in the file and is supplied on the command line for a device build.
+        # A team baked in here would fail every build on a machine that does not hold that team's
+        # certificate — the CI runner holds none, and the simulator needs no signature at all.
         CODE_SIGNING_ALLOWED: NO
         # An asset catalogue makes the compiler look for an app icon named "AppIcon" and fail
         # without one. This demo ships no icon, and saying so is more honest than an empty icon
