@@ -13,8 +13,8 @@ private let clean = RunConditions(
     batteryLevel: 0.8,
     debuggerAttached: false,
     displayMaximumFramesPerSecond: 120,
-    highFrameRateOptIn: true,
-    requestedMaximumFramesPerSecond: 120,
+    frameRate: FrameRateRequest(displayMaximumFramesPerSecond: 120,
+                                optedInToHighFrameRate: true),
     idleTimerDisabled: true
 )
 
@@ -50,10 +50,10 @@ func everyConditionTheProcedureNamesBlocksOnItsOwn() {
     cases.append(("battery 39 %", flat))
     var traced = clean; traced.debuggerAttached = true
     cases.append(("debugger", traced))
-    var capped = clean; capped.highFrameRateOptIn = false
+    var capped = clean
+    capped.frameRate = FrameRateRequest(displayMaximumFramesPerSecond: 120,
+                                        optedInToHighFrameRate: false)
     cases.append(("no opt-in", capped))
-    var lazyLink = clean; lazyLink.requestedMaximumFramesPerSecond = 60
-    cases.append(("link asks 60", lazyLink))
     var dims = clean; dims.idleTimerDisabled = false
     cases.append(("auto-lock", dims))
 
@@ -93,7 +93,8 @@ func anAbsentBatteryReadingIsUncheckedRatherThanViolated() {
 func aSixtyHertzDisplayIsSatisfiedWithoutTheOptIn() {
     var plain = clean
     plain.displayMaximumFramesPerSecond = 60
-    plain.highFrameRateOptIn = false
+    plain.frameRate = FrameRateRequest(displayMaximumFramesPerSecond: 60,
+                                       optedInToHighFrameRate: false)
     #expect(blockingTitles(plain).isEmpty)
 }
 
@@ -108,29 +109,17 @@ func theReasonNamesEveryBlockingCondition() {
     #expect(reason?.contains("low power mode off") == true)
 }
 
-/// The frame rate row says which half is missing, because the two are fixed in different places.
+/// The frame rate row says what is capping the app, and it is now the only thing that can.
 ///
-/// One is a key in the bundle, the other is a value on the display link. A row that only said
-/// "not getting 120 Hz" would send the reader to look at both, and this project has already spent
-/// a session doing exactly that.
+/// It used to name two halves — the bundle key and the range on the link. The second stopped being
+/// representable when the ticker began taking a request it cannot contradict, so the row names the
+/// half that remains.
 @Test
-func theFrameRateRowNamesWhichHalfIsMissing() throws {
+func theFrameRateRowNamesTheCap() throws {
     var noKey = clean
-    noKey.highFrameRateOptIn = false
-    let missingKey = try #require(RunPreconditions.list(for: noKey).first { $0.state == .violated })
-    #expect(missingKey.detail.contains("opt-in") == true, "\(missingKey.detail)")
-    #expect(missingKey.detail.contains("asks for") == false, "named the link, which is fine")
-
-    var lazyLink = clean
-    lazyLink.requestedMaximumFramesPerSecond = 60
-    let asking = try #require(RunPreconditions.list(for: lazyLink).first { $0.state == .violated })
-    #expect(asking.detail.contains("asks for 60") == true, "\(asking.detail)")
-    #expect(asking.detail.contains("opt-in") == false)
-
-    var both = clean
-    both.highFrameRateOptIn = false
-    both.requestedMaximumFramesPerSecond = 60
-    let pair = try #require(RunPreconditions.list(for: both).first { $0.state == .violated })
-    #expect(pair.detail.contains("opt-in") == true)
-    #expect(pair.detail.contains("asks for 60") == true)
+    noKey.frameRate = FrameRateRequest(displayMaximumFramesPerSecond: 120,
+                                       optedInToHighFrameRate: false)
+    let row = try #require(RunPreconditions.list(for: noKey).first { $0.state == .violated })
+    #expect(row.detail.contains("opt-in"), "\(row.detail)")
+    #expect(row.detail.contains("120"), "\(row.detail)")
 }

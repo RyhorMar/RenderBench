@@ -130,7 +130,26 @@ final class ChartScene {
     ///     caller that does not care which backend starts still gets one that exists.
     ///   - ticker: Source of display ticks. A test substitutes a manually driven one; every other
     ///     caller takes the default, which drives frames from the real display link.
-    init(renderer: any ChartRenderer = Catalogue.renderers[0].make(), ticker: any DisplayTicking = DisplayLinkTicker()) {
+    /// The display's rate as UIKit reports it, or 120 when no window scene exists yet.
+    ///
+    /// The fallback is deliberately the high one. A request above what the display can do is
+    /// clamped by the system — measured on an iPhone 16 Pro, 10 September 2026: asking for 240
+    /// produced 119.98 Hz — while a request below it is not recovered by anything. Guessing high
+    /// costs nothing; guessing low is the defect this whole arrangement exists to prevent.
+    static func displayMaximumFramesPerSecond() -> Int {
+        UIApplication.shared.connectedScenes
+            .compactMap { ($0 as? UIWindowScene)?.screen.maximumFramesPerSecond }
+            .first ?? 120
+    }
+
+    init(
+        renderer: any ChartRenderer = Catalogue.renderers[0].make(),
+        ticker: any DisplayTicking = DisplayLinkTicker(
+            request: .current(
+                displayMaximumFramesPerSecond: ChartScene.displayMaximumFramesPerSecond()
+            )
+        )
+    ) {
         self.renderer = renderer
         self.ticker = ticker
         scratch.reserveCapacity(4_096)

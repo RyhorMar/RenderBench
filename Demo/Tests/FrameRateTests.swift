@@ -26,18 +26,17 @@ func noNearMissSpellingOfThatKeySurvivesInTheBundle() {
     #expect(related == ["CADisableMinimumFrameDurationOnPhone"], "found \(related.sorted())")
 }
 
-/// The other half of the same defect: the key alone does not raise the frame rate.
+/// The other half of the same defect, asked of this application's own bundle.
 ///
 /// With the key in place and `CAFrameRateRange.default` on the link, an iPhone 16 Pro ticked at
-/// 59.60 Hz; the same device under an explicit range ticked at 119.98 Hz. So the default the app
-/// takes has to be an explicit range, and a change back to `.default` has to fail here rather
-/// than in a results file six weeks later.
+/// 59.60 Hz; the same device under an explicit range ticked at 119.98 Hz. The range itself is a
+/// package concern and tested there; what only this target can answer is whether the bundle this
+/// app ships actually unlocks it.
 @MainActor
 @Test
-func theTickerAsksForTheDisplaysHighestRateByDefault() {
-    let requested = DisplayLinkTicker().preferredRange
-    #expect(requested.preferred == 120)
-    #expect(requested.maximum == 120)
-    #expect(requested.minimum == 60)
-    #expect(requested != .default)
+func thisApplicationsBundleUnlocksTheDisplaysHighestRate() {
+    let request = FrameRateRequest.current(displayMaximumFramesPerSecond: 120)
+    #expect(request.optInMissing == false, "the bundle caps this app at 60 Hz")
+    #expect(request.range.maximum == 120)
+    #expect(request.range != .default)
 }

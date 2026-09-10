@@ -20,10 +20,9 @@ struct RunConditions: Equatable {
     var debuggerAttached: Bool
     /// What the display can do, from `UIScreen.maximumFramesPerSecond`.
     var displayMaximumFramesPerSecond: Int
-    /// Whether the high frame rate opt-in is in the bundle, under the name the system reads.
-    var highFrameRateOptIn: Bool
-    /// The maximum the display link is configured to ask for.
-    var requestedMaximumFramesPerSecond: Double
+    /// What the display link is asking for, and whether the bundle caps it. Derived once, there,
+    /// rather than restated by every reader.
+    var frameRate: FrameRateRequest
     var idleTimerDisabled: Bool
 
     @MainActor
@@ -33,7 +32,6 @@ struct RunConditions: Equatable {
         let screen = UIApplication.shared.connectedScenes
             .compactMap { ($0 as? UIWindowScene)?.screen }
             .first
-        let key = Bundle.main.object(forInfoDictionaryKey: "CADisableMinimumFrameDurationOnPhone")
         return RunConditions(
             isSimulator: RunEnvironment.isRunningOnSimulator,
             isDebugBuild: isDebugBuild,
@@ -42,8 +40,9 @@ struct RunConditions: Equatable {
             batteryLevel: level >= 0 ? Double(level) : nil,
             debuggerAttached: isDebuggerAttached(),
             displayMaximumFramesPerSecond: screen?.maximumFramesPerSecond ?? 60,
-            highFrameRateOptIn: (key as? Bool) == true,
-            requestedMaximumFramesPerSecond: Double(DisplayLinkTicker.displayMaximum.maximum),
+            frameRate: FrameRateRequest.current(
+                displayMaximumFramesPerSecond: screen?.maximumFramesPerSecond ?? 60
+            ),
             idleTimerDisabled: UIApplication.shared.isIdleTimerDisabled
         )
     }

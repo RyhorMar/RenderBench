@@ -36,8 +36,8 @@ private let goodMachine = RunConditions(
     batteryLevel: 0.9,
     debuggerAttached: false,
     displayMaximumFramesPerSecond: 120,
-    highFrameRateOptIn: true,
-    requestedMaximumFramesPerSecond: 120,
+    frameRate: FrameRateRequest(displayMaximumFramesPerSecond: 120,
+                                optedInToHighFrameRate: true),
     idleTimerDisabled: true
 )
 

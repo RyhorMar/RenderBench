@@ -98,19 +98,13 @@ enum RunPreconditions {
     /// The one this project learned by measuring: the app ran at half the display's rate for its
     /// whole life while every property it asked reported 120.
     private static func frameRate(_ c: RunConditions) -> Precondition {
-        let display = Double(c.displayMaximumFramesPerSecond)
-        let asking = min(c.requestedMaximumFramesPerSecond, display)
-        let optInNeeded = display > 60
-        let held = (!optInNeeded || c.highFrameRateOptIn) && asking >= display
-        var missing: [String] = []
-        if optInNeeded && !c.highFrameRateOptIn { missing.append("the bundle opt-in is absent") }
-        if asking < display { missing.append("the display link asks for \(Int(asking))") }
+        let ceiling = Int(c.frameRate.range.maximum)
         return Precondition(
             title: "Asking the display for everything it has",
-            detail: held
-                ? "\(Int(display)) Hz display, and the display link asks for \(Int(display))"
-                : "\(Int(display)) Hz display, but " + missing.joined(separator: " and "),
-            state: held ? .held : .violated
+            detail: c.frameRate.optInMissing
+                ? "\(c.displayMaximumFramesPerSecond) Hz display, but the bundle opt-in is absent, so \(ceiling) is the cap"
+                : "\(c.displayMaximumFramesPerSecond) Hz display, and the display link asks for \(ceiling)",
+            state: c.frameRate.optInMissing ? .violated : .held
         )
     }
 
