@@ -1,4 +1,5 @@
-import Foundation
+import SwiftUI
+import UIKit
 
 /// The bundled faces, by the name the font system answers to.
 ///
@@ -27,4 +28,26 @@ enum AppFont {
     /// a fallback answers with the system family, not with one of these.
     static let sansFamily = "IBM Plex Sans"
     static let monoFamily = "IBM Plex Mono"
+
+    /// A mono face that scales with the reader's setting and stops at `cappedAt`.
+    ///
+    /// The project's Dynamic Type decision in one place: numbers and mono labels do scale — a
+    /// monospaced column stays aligned under scaling, since every cell of a style scales by the same
+    /// factor — but they stop growing before they push the row apart. The ceiling is per role and
+    /// passed in, because what a row can absorb is a property of the row.
+    ///
+    /// `scaledValue(for:)` has no ceiling of its own, so the clamp is applied here and the result
+    /// asked for as a fixed size: a second scaling pass on an already scaled value would compound.
+    static func mono(_ size: CGFloat, cappedAt ceiling: CGFloat, weight: Font.Weight = .medium) -> Font {
+        let scaled = min(UIFontMetrics(forTextStyle: .footnote).scaledValue(for: size), ceiling)
+        return .custom(monoName(for: weight), fixedSize: scaled)
+    }
+
+    static func monoName(for weight: Font.Weight) -> String {
+        switch weight {
+        case .semibold, .bold, .heavy, .black: monoSemiBold
+        case .regular, .light, .thin, .ultraLight: monoRegular
+        default: monoMedium
+        }
+    }
 }
