@@ -22,14 +22,29 @@ public final class DisplayLinkTicker: DisplayTicking {
         }
     }
 
+    /// The rate a measurement asks for: everything the display will give.
+    ///
+    /// Not `CAFrameRateRange.default`. That one leaves the choice to the system and the system
+    /// chooses 60 Hz — measured on an iPhone 16 Pro, iOS 26.5.2, 10 September 2026: 59.60 Hz under
+    /// the default range against 119.98 Hz under every explicit range tried, with the high frame
+    /// rate opt-in already in place. A default that silently halves the frame rate is worse than
+    /// no default, because the number it produces still looks like a measurement.
+    ///
+    /// A maximum above what the display can do is a ceiling on the request, not a claim about the
+    /// hardware: asking for 240 on the same device produced 119.98 Hz, clamped rather than
+    /// refused. The minimum is the floor every iOS display meets, and it is there to stop the
+    /// system throttling down in the middle of a run.
+    public static let displayMaximum = CAFrameRateRange(minimum: 60, maximum: 120, preferred: 120)
+
     private let proxy = Proxy()
     private var link: CADisplayLink?
-    private let preferredRange: CAFrameRateRange
 
-    /// - Parameter preferredRange: Frame rate to request. The default lets the system choose,
-    ///   which on a ProMotion device means the range is decided by what else is on screen; a
-    ///   benchmark pins it explicitly instead.
-    public init(preferredRange: CAFrameRateRange = .default) {
+    /// Frame rate this ticker asks the system for. A measurement that reports a frame rate has to
+    /// be able to say what it requested, because the system is free to give something else.
+    public let preferredRange: CAFrameRateRange
+
+    /// - Parameter preferredRange: Frame rate to request. Defaults to ``displayMaximum``.
+    public init(preferredRange: CAFrameRateRange = DisplayLinkTicker.displayMaximum) {
         self.preferredRange = preferredRange
     }
 

@@ -27,8 +27,12 @@
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
 	<!-- Without this the display link is capped at 60 Hz on a ProMotion device, and every
-	     120 Hz measurement in this project would silently be a 60 Hz measurement. -->
-	<key>CADisableMinimumFrameDuration</key>
+	     120 Hz measurement in this project would silently be a 60 Hz measurement.
+	     The trailing OnPhone is the whole key: an unknown key is ignored in silence, and the
+	     app then runs at 60 Hz however the display link is configured. Measured on an
+	     iPhone 16 Pro, iOS 26.5.2, 10 September 2026: without this key a link pinned to
+	     120 Hz still ticked at 59.99 Hz; with it, 119.98 Hz. -->
+	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
 	<!-- File names, not PostScript names: a face absent from this list is not registered, and
 	     `UIFont(name:)` then returns nil and every label silently falls back to the system font.
