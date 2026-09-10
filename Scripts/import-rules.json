@@ -139,6 +139,7 @@
     "Tests/BenchRuntimeTests": {
       "system": [
         "Foundation",
+        "QuartzCore",
         "Testing"
       ],
       "local": [
