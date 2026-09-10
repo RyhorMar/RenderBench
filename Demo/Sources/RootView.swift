@@ -6,6 +6,17 @@ struct RootView: View {
     @State private var path: [Route] = []
     @State private var registry = SceneRegistry()
 
+    /// Launch argument that opens the measure screen and starts the run without anybody touching
+    /// the screen.
+    ///
+    /// A benchmark cannot be started from Xcode: a debugger attached to the process is one of the
+    /// conditions the run refuses to start under, and it is refused for a reason — a traced
+    /// process pays for the tracing in every frame. Launching by hand works and takes three taps
+    /// per repeat, of which there are three. This is how the same run is started from a script
+    /// with no debugger and no automation present: the process is launched, and nothing else is
+    /// attached to it.
+    static let autoStartArgument = "-measure"
+
     var body: some View {
         NavigationStack(path: $path) {
             List {
@@ -37,6 +48,11 @@ struct RootView: View {
                 case .results:
                     ResultsScreen()
                 }
+            }
+        }
+        .onAppear {
+            if ProcessInfo.processInfo.arguments.contains(Self.autoStartArgument) {
+                path = [.measure]
             }
         }
         .onChange(of: path) { oldPath, newPath in

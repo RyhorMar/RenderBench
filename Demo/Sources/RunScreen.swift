@@ -1,4 +1,5 @@
 import BenchHost
+import Foundation
 import SwiftUI
 
 /// The screen that takes a measurement: what has to hold, what is being measured now, and the file
@@ -138,6 +139,7 @@ struct RunScreen: View {
         let made = BenchmarkRunner(scene: scene, storage: storage)
         scene.onFrame = { [weak made] in made?.frameDrawn() }
         runner = made
+        if ProcessInfo.processInfo.arguments.contains(RootView.autoStartArgument) { start() }
     }
 
     private func start() {
