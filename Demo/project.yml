@@ -122,7 +122,13 @@ schemes:
     test:
       targets:
         - RenderBenchDemoTests
-        - RenderBenchDemoUITests
+        - name: RenderBenchDemoUITests
+          # The device sweep is a tool, not a test of anything. Left in the scheme's test action it
+          # would run on a simulator in every lane — ninety seconds of it — and print readings that
+          # look exactly like measurements while describing the host's GPU. It is invoked by name,
+          # against a device, and nowhere else.
+          skippedTests:
+            - DeviceSweepTests
     run:
       config: Debug
     profile:

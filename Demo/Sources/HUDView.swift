@@ -78,10 +78,16 @@ struct HUDView: View {
         }
     }
 
+    /// The value cell carries an identifier derived from the row's name, so a sweep driving the app
+    /// on a device can read a specific reading instead of counting unlabelled text nodes. The label
+    /// half stays unidentified: it never changes, and a query matching both would return two
+    /// elements for one row.
     private func row(_ name: String, _ value: String) -> some View {
         HStack(spacing: 6) {
             Text(name).foregroundStyle(.secondary)
-            Text(value).monospacedDigit()
+            Text(value)
+                .monospacedDigit()
+                .accessibilityIdentifier("hud." + name.replacingOccurrences(of: " ", with: "-"))
         }
     }
 }
