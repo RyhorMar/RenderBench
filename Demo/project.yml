@@ -31,6 +31,10 @@ targets:
     platform: iOS
     sources:
       - path: Sources
+      # Written out separately because `sources` is the only place a generated project learns
+      # about a file: an asset catalogue that is not listed here does not reach the target, and
+      # the app builds on this machine off a stale build folder while failing on a clean clone.
+      - path: Resources
     settings:
       base:
         INFOPLIST_FILE: Info.plist
@@ -38,6 +42,10 @@ targets:
         PRODUCT_NAME: RenderBenchDemo
         TARGETED_DEVICE_FAMILY: "1,2"
         CODE_SIGNING_ALLOWED: NO
+        # An asset catalogue makes the compiler look for an app icon named "AppIcon" and fail
+        # without one. This demo ships no icon, and saying so is more honest than an empty icon
+        # set that looks like an unfinished one.
+        ASSETCATALOG_COMPILER_APPICON_NAME: ""
     dependencies:
       - package: RenderBench
         product: BenchCore
