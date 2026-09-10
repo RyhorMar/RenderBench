@@ -11,6 +11,9 @@ Demo/*.xcodeproj
 Demo/.build-demo/
 # A device build lands here: signed, unlike the simulator one, and just as regenerable.
 Demo/.build-device/
+# The measurement scheme's own folder, so a run's binary is not rebuilt out from under it by a
+# lane that happens to share a derived data path.
+Demo/.build-measure/
 
 fastlane/report.xml
 fastlane/Preview.html
