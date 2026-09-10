@@ -64,6 +64,7 @@ enum ResultExport {
                     measuredFrames: cpu.sampleCount,
                     repeatIndex: 1,
                     cpu: cpu,
+                    raster: scene.rasterStatistics,
                     gpu: scene.gpuStatistics,
                     missedDeadlineRatio: nil,
                     pointsSubmitted: scene.pointsSubmitted,
@@ -119,6 +120,10 @@ enum ResultExport {
             measuredFrames: cpu.sampleCount,
             repeatIndex: repeatIndex,
             cpu: cpu,
+            // Four backends of the nine time their own draw pass. Dropping it here made the file
+            // say none of them did, which is a stronger claim than omitting the column and a false
+            // one — and it is the column the cost of a frame is argued in.
+            raster: scene.rasterStatistics,
             gpu: scene.gpuStatistics,
             missedDeadlineRatio: nil,
             pointsSubmitted: scene.pointsSubmitted,

@@ -1,6 +1,8 @@
+import BenchHost
 import BenchRuntime
 import CoreGraphics
 import Foundation
+import SwiftUI
 import Testing
 @testable import RenderBenchDemo
 
@@ -424,4 +426,70 @@ func theRateCountsWhenFramesWereDrawnNotWhenTheyWereDue() {
 
     #expect((35.0...45.0).contains(scene.observedHz ?? 0),
             "read \(String(describing: scene.observedHz))")
+}
+
+/// A backend that times its own draw pass, without needing a view on screen.
+///
+/// The four real ones — canvas, metal, core-image, metal-compute — hand a recorder to their
+/// `surface`, so the reading arrives while the view draws. A unit test has no view, so no real
+/// backend can produce one here, and a test built on one of them would assert nothing. This one
+/// reports a fixed reading from `takeDeferredTimes()`, which is the only part the case assembly
+/// reads.
+@MainActor
+private final class RasterReportingRenderer: ChartRenderer {
+    static let descriptor = RendererDescriptor(
+        identifier: "canvas", displayName: "Raster reporting",
+        reportsRasterTime: true, reportsGPUTime: false
+    )
+    static let capabilities: [Capability] = []
+    private(set) var encodedRevision: UInt64 = 0
+
+    init() {}
+
+    func encode(_ frame: PreparedFrame) -> EncodeReport {
+        encodedRevision &+= 1
+        return EncodeReport(encodeNs: 1_000, pointsDrawn: frame.pointsSubmitted, drawCalls: 1)
+    }
+
+    func takeDeferredTimes() -> DeferredTimes {
+        DeferredTimes(
+            raster: RasterTimeReading(nanoseconds: 900_000, encodedRevision: encodedRevision),
+            gpu: nil,
+            presentedTime: nil
+        )
+    }
+
+    var surface: AnyView { AnyView(EmptyView()) }
+    func suspend() {}
+    func resume() {}
+    func teardown() {}
+}
+
+/// The rasterisation column reaches the file when the backend can report it.
+///
+/// Four backends of the nine time their own draw pass, the scene collects it and the overlay shows
+/// it — and the first accepted measurement carried none of it, because the value was never handed
+/// to the case. A file that says "no backend reported rasterisation" when four did is worse than
+/// one that omits the column, and it is the column two open questions about the cost of a frame
+/// are asked in.
+@MainActor
+@Test
+func aBackendThatTimesItsOwnDrawPassGetsThatIntoTheFile() {
+    let ticker = ManualTicker()
+    let scene = ChartScene(renderer: RasterReportingRenderer(), ticker: ticker)
+    scene.chartSize = CGSize(width: 400, height: 200)
+    scene.start()
+
+    var time = 0.0
+    for _ in 0..<40 {
+        ticker.fire(at: time)
+        time += 1.0 / 120
+    }
+
+    #expect(scene.rasterStatistics != nil, "the scene never collected a raster time to begin with")
+    let measured = ResultExport.measuredCase(
+        from: scene, refreshHz: 120, warmupFrames: 120, repeatIndex: 1
+    )
+    #expect(measured?.raster != nil, "the case dropped the raster time the scene had")
+    #expect(measured?.raster?.p50Ns == 900_000)
 }
