@@ -135,3 +135,19 @@ schemes:
       config: Release
     archive:
       config: Release
+
+  # The scheme a measurement is taken with, and the only one whose binary is the one that would
+  # ship. The scheme above builds the unit test target alongside the app, and that target uses
+  # `@testable import`, which in Release needs `ENABLE_TESTABILITY=YES` on the whole build — so a
+  # run taken through it measures a binary with testability enabled, which the release build does
+  # not have. This one builds the application and nothing else, so there is nothing to enable.
+  RenderBenchDemoMeasure:
+    build:
+      targets:
+        RenderBenchDemo: [run, profile, archive]
+    run:
+      config: Release
+    profile:
+      config: Release
+    archive:
+      config: Release

@@ -151,7 +151,7 @@ struct RunScreen: View {
 }
 
 /// The system share sheet, which is how a JSON file leaves the phone without Xcode.
-private struct ShareSheet: UIViewControllerRepresentable {
+struct ShareSheet: UIViewControllerRepresentable {
     let url: URL
 
     func makeUIViewController(context: Context) -> UIActivityViewController {

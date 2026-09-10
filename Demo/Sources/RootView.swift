@@ -19,6 +19,7 @@ struct RootView: View {
                 }
                 NavigationLink("Compare", value: Route.compare)
                 NavigationLink("Measure", value: Route.measure)
+                NavigationLink("Results", value: Route.results)
             }
             .navigationTitle("RenderBench")
             // Attached to the List's content, not inside the ForEach that builds its rows: a
@@ -33,6 +34,8 @@ struct RootView: View {
                     CompareScreen()
                 case .measure:
                     RunScreen()
+                case .results:
+                    ResultsScreen()
                 }
             }
         }
