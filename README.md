@@ -35,7 +35,7 @@ throttled device, and no run has been made that passes it. Accessibility and the
 types are not written.
 
 ```
-swift test          # the package: 342 tests
+swift test          # the package's own tests
 fastlane ci         # package, tests, layering rule, demo build
 fastlane run_demo   # build, install and launch on a booted simulator
 ```
