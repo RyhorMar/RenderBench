@@ -40,7 +40,10 @@ final class ChartScene {
     private(set) var gpuStatistics: FrameStatistics?
     private(set) var framesDrawn: UInt64 = 0
     private(set) var droppedFrames: UInt64 = 0
-    private(set) var observedHz: Double = 0
+    /// Frames per second over the last second, counted. `nil` while the scene has drawn fewer
+    /// than two frames inside that window — including after it stopped, where a held-over number
+    /// would describe a scene that is no longer drawing.
+    private(set) var observedHz: Double?
 
     /// Samples handed to the active backend after downsampling, for the most recent frame.
     private(set) var pointsSubmitted: Int = 0
@@ -123,7 +126,7 @@ final class ChartScene {
     private var streams: [SignalStream] = []
     private var sourceRateHz: Double = 100
     private var yDomain: ClosedRange<Double> = -1...1
-    private var lastTickTimestamp: Double?
+    private var meter = FrameRateMeter()
 
     /// - Parameters:
     ///   - renderer: The backend to start with. Defaults to the catalogue's first entry so a
@@ -176,7 +179,8 @@ final class ChartScene {
         if let subscription { clock?.unsubscribe(subscription) }
         subscription = nil
         clock = nil
-        lastTickTimestamp = nil
+        meter = FrameRateMeter()
+        observedHz = nil
         renderer.suspend()
     }
 
@@ -302,11 +306,8 @@ final class ChartScene {
     private func advance(_ tick: FrameTick) {
         guard isRunning, chartSize.width > 1 else { return }
 
-        if let previous = lastTickTimestamp {
-            let delta = tick.timestamp - previous
-            if delta > 0 { observedHz = 1 / delta }
-        }
-        lastTickTimestamp = tick.timestamp
+        meter.record(timestamp: tick.timestamp)
+        observedHz = meter.rate
 
         guard let plan = pipeline.advance(tick: tick) else { return }
         produce(upTo: plan.samplesDue)

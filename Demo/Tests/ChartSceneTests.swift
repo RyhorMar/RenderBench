@@ -14,9 +14,12 @@ final class ManualTicker: DisplayTicking {
     func start(_ onTick: @escaping (FrameTick) -> Void) { self.onTick = onTick }
     func stop() { onTick = nil }
 
-    func fire(at seconds: Double) {
+    /// - Parameter targetOffset: distance from the tick to the frame it is preparing. Fixed on a
+    ///   manual ticker and variable on a real display link, where it is the current frame's
+    ///   duration — which is exactly why a test can use it to tell the two timestamps apart.
+    func fire(at seconds: Double, targetOffset: Double = 1.0 / 120) {
         frame += 1
-        onTick?(FrameTick(frameID: frame, targetTimestamp: seconds + 1.0 / 120, timestamp: seconds))
+        onTick?(FrameTick(frameID: frame, targetTimestamp: seconds + targetOffset, timestamp: seconds))
     }
 }
 

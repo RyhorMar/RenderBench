@@ -25,7 +25,7 @@ struct HUDView: View {
                     .monospacedDigit()
                     .accessibilityIdentifier("hud.frames")
             }
-            row("fps", String(format: "%.0f", scene.observedHz))
+            row("fps", Reading.text(scene.observedHz.map { String(format: "%.0f", $0) }))
             row("policy", policyLabel)
             // Two columns, not one. "prep" is preparation plus geometry building; "draw" is the
             // rasterisation the backend could time. Adding them into a single figure and calling

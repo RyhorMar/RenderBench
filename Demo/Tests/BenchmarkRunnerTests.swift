@@ -256,12 +256,16 @@ func theRecordedRefreshRateIsTheDisplaysNotTheOneJustObserved() {
     storage.plan = plan
     runner.resume()
 
+    // Read while the case is being measured, not after: a stopped scene reports no rate at all,
+    // which is the honest answer and not the one this control needs.
+    var seenWhileMeasuring: Double?
     var time = 0.0
     for _ in 0..<2_000 {
         switch runner.phase {
         case .warmup, .measuring:
             time += 1.0 / 40
             ticker.fire(at: time)
+            if case .measuring = runner.phase { seenWhileMeasuring = scene.observedHz }
         case .cooling:
             runner.secondElapsed()
         default:
@@ -270,7 +274,8 @@ func theRecordedRefreshRateIsTheDisplaysNotTheOneJustObserved() {
         if case .wrote = runner.phase { break }
     }
 
-    #expect(Int(scene.observedHz.rounded()) == 40, "the scene saw \(scene.observedHz)")
+    #expect(seenWhileMeasuring.map { Int($0.rounded()) } == 40,
+            "the scene saw \(String(describing: seenWhileMeasuring))")
     #expect(storage.written.first?.cases.first?.refreshHz == 120)
 }
 
@@ -357,4 +362,66 @@ func aCaseInterruptedPartWayIsAbandonedAndItsRepeatDropped() {
     scene.onFrame = { [weak runnerAgain] in runnerAgain?.frameDrawn() }
     runnerAgain.resume()
     #expect(runnerAgain.plan?.cases.isEmpty == true)
+}
+
+/// The overlay's rate is counted over a window, not taken from the last pair of ticks.
+///
+/// Driven at forty frames a second with one full-rate gap at the end: an instantaneous reading
+/// would answer 120, which is what the overlay answered on a device for a backend sustaining 73.
+@MainActor
+@Test
+func theScenesObservedRateIsCountedOverAWindow() {
+    let ticker = ManualTicker()
+    let scene = makeScene(ticker)
+    scene.start()
+
+    var time = 0.0
+    for _ in 0..<80 {
+        ticker.fire(at: time)
+        time += 1.0 / 40
+    }
+    ticker.fire(at: time - 1.0 / 40 + 1.0 / 120)
+
+    #expect(scene.observedHz.map { Int($0.rounded()) } != 120)
+    #expect((35.0...45.0).contains(scene.observedHz ?? 0),
+            "read \(String(describing: scene.observedHz))")
+}
+
+/// A stopped scene reports nothing rather than the last rate it saw.
+@MainActor
+@Test
+func aStoppedSceneReportsNoRate() {
+    let ticker = ManualTicker()
+    let scene = makeScene(ticker)
+    scene.start()
+    ticker.fire(at: 0)
+    ticker.fire(at: 1.0 / 120)
+    #expect(scene.observedHz != nil)
+    scene.stop()
+    #expect(scene.observedHz == nil)
+}
+
+/// The rate counts when frames were drawn, not when they were expected to appear.
+///
+/// The two differ by the current frame's duration, which is constant on a manual ticker and is not
+/// on a display link: it is the very thing that changes when the rate does. Fired at forty frames
+/// a second with a target offset that grows every frame, so a meter fed the wrong timestamp reads
+/// about nine instead of forty.
+@MainActor
+@Test
+func theRateCountsWhenFramesWereDrawnNotWhenTheyWereDue() {
+    let ticker = ManualTicker()
+    let scene = makeScene(ticker)
+    scene.start()
+
+    var time = 0.0
+    var offset = 0.1
+    for _ in 0..<80 {
+        ticker.fire(at: time, targetOffset: offset)
+        time += 1.0 / 40
+        offset += 0.1
+    }
+
+    #expect((35.0...45.0).contains(scene.observedHz ?? 0),
+            "read \(String(describing: scene.observedHz))")
 }
