@@ -51,6 +51,16 @@ enum AppChrome {
     /// against the surfaces of its own theme: 4.71:1 light, 7.71:1 dark.
     static let accent = Color(.accent)
 
+    /// A precondition that does not hold, and nothing else. One value for both themes, as delivered.
+    ///
+    /// `oklch(0.55 0.17 25)` in the design, which is inside sRGB and maps to this exactly. Measured
+    /// on the ground it is drawn on — a row's card: **5.28:1 in light, 3.34:1 in dark**. The dark
+    /// figure is below the 4.5:1 floor for text at this size and above the 3:1 floor for graphics,
+    /// so the colour alone would not carry the state in the dark theme. It does not have to: the row
+    /// also carries a distinct mark and says in words what failed. Colour duplicates the state here,
+    /// as this project requires everywhere.
+    static let alert = Color(.alert)
+
     /// The chart's furniture in the app's own colours.
     ///
     /// Without this the app carried two independent definitions of a surface: the package's default
