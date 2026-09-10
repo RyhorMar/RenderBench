@@ -1,0 +1,662 @@
+{
+  "cases": [
+    {
+      "backend": "shape-path",
+      "chartKind": "strip-chart",
+      "cpu": {
+        "maxNs": 368581,
+        "p50Ns": 198123,
+        "p95Ns": 236956,
+        "p99Ns": 268293,
+        "sampleCount": 1190
+      },
+      "equivalence": "notChecked",
+      "measuredFrames": 1190,
+      "pointsDrawn": 2512,
+      "pointsPerSeries": 1002,
+      "pointsSubmitted": 2512,
+      "policy": "minMax",
+      "refreshHz": 120,
+      "repeatIndex": 1,
+      "seriesCount": 8,
+      "warmupFrames": 120
+    },
+    {
+      "backend": "core-animation",
+      "chartKind": "strip-chart",
+      "cpu": {
+        "maxNs": 846667,
+        "p50Ns": 484832,
+        "p95Ns": 635500,
+        "p99Ns": 717417,
+        "sampleCount": 1190
+      },
+      "equivalence": "notChecked",
+      "measuredFrames": 1190,
+      "pointsDrawn": 2512,
+      "pointsPerSeries": 1002,
+      "pointsSubmitted": 2512,
+      "policy": "minMax",
+      "refreshHz": 120,
+      "repeatIndex": 1,
+      "seriesCount": 8,
+      "warmupFrames": 120
+    },
+    {
+      "backend": "shader",
+      "chartKind": "strip-chart",
+      "cpu": {
+        "maxNs": 1536667,
+        "p50Ns": 1362833,
+        "p95Ns": 1402208,
+        "p99Ns": 1449167,
+        "sampleCount": 1190
+      },
+      "equivalence": "notChecked",
+      "measuredFrames": 1190,
+      "pointsDrawn": 2512,
+      "pointsPerSeries": 1002,
+      "pointsSubmitted": 2512,
+      "policy": "minMax",
+      "refreshHz": 120,
+      "repeatIndex": 1,
+      "seriesCount": 8,
+      "warmupFrames": 120
+    },
+    {
+      "backend": "core-image",
+      "chartKind": "strip-chart",
+      "cpu": {
+        "maxNs": 3855210,
+        "p50Ns": 3506834,
+        "p95Ns": 3607875,
+        "p99Ns": 3698291,
+        "sampleCount": 1190
+      },
+      "drawCalls": 1,
+      "equivalence": "notChecked",
+      "gpu": {
+        "maxNs": 1491250,
+        "p50Ns": 118333,
+        "p95Ns": 549250,
+        "p99Ns": 801125,
+        "sampleCount": 1190
+      },
+      "measuredFrames": 1190,
+      "pointsPerSeries": 1002,
+      "pointsSubmitted": 2512,
+      "policy": "minMax",
+      "refreshHz": 120,
+      "repeatIndex": 1,
+      "seriesCount": 8,
+      "warmupFrames": 120
+    },
+    {
+      "backend": "canvas",
+      "chartKind": "strip-chart",
+      "cpu": {
+        "maxNs": 381958,
+        "p50Ns": 282666,
+        "p95Ns": 312167,
+        "p99Ns": 340294,
+        "sampleCount": 1190
+      },
+      "drawCalls": 11,
+      "equivalence": "notChecked",
+      "measuredFrames": 1190,
+      "pointsDrawn": 2512,
+      "pointsPerSeries": 1002,
+      "pointsSubmitted": 2512,
+      "policy": "minMax",
+      "refreshHz": 120,
+      "repeatIndex": 1,
+      "seriesCount": 8,
+      "warmupFrames": 120
+    },
+    {
+      "backend": "scenekit",
+      "chartKind": "strip-chart",
+      "cpu": {
+        "maxNs": 1036251,
+        "p50Ns": 705208,
+        "p95Ns": 877959,
+        "p99Ns": 930750,
+        "sampleCount": 1190
+      },
+      "equivalence": "notChecked",
+      "measuredFrames": 1190,
+      "pointsDrawn": 2512,
+      "pointsPerSeries": 1002,
+      "pointsSubmitted": 2512,
+      "policy": "minMax",
+      "refreshHz": 120,
+      "repeatIndex": 1,
+      "seriesCount": 8,
+      "warmupFrames": 120
+    },
+    {
+      "backend": "metal-compute",
+      "chartKind": "strip-chart",
+      "cpu": {
+        "maxNs": 2059874,
+        "p50Ns": 1575875,
+        "p95Ns": 1756126,
+        "p99Ns": 1816083,
+        "sampleCount": 1190
+      },
+      "drawCalls": 10,
+      "equivalence": "notChecked",
+      "gpu": {
+        "maxNs": 627375,
+        "p50Ns": 237666,
+        "p95Ns": 485000,
+        "p99Ns": 613583,
+        "sampleCount": 1190
+      },
+      "measuredFrames": 1190,
+      "pointsDrawn": 2496,
+      "pointsPerSeries": 1002,
+      "pointsSubmitted": 7992,
+      "policy": "minMax",
+      "refreshHz": 120,
+      "repeatIndex": 1,
+      "seriesCount": 8,
+      "warmupFrames": 120
+    },
+    {
+      "backend": "metal",
+      "chartKind": "strip-chart",
+      "cpu": {
+        "maxNs": 243333,
+        "p50Ns": 177460,
+        "p95Ns": 205582,
+        "p99Ns": 220499,
+        "sampleCount": 1190
+      },
+      "drawCalls": 10,
+      "equivalence": "notChecked",
+      "gpu": {
+        "maxNs": 624333,
+        "p50Ns": 523083,
+        "p95Ns": 552125,
+        "p99Ns": 565041,
+        "sampleCount": 1190
+      },
+      "measuredFrames": 1190,
+      "pointsDrawn": 2512,
+      "pointsPerSeries": 1002,
+      "pointsSubmitted": 2512,
+      "policy": "minMax",
+      "refreshHz": 120,
+      "repeatIndex": 1,
+      "seriesCount": 8,
+      "warmupFrames": 120
+    },
+    {
+      "backend": "swift-charts",
+      "chartKind": "strip-chart",
+      "cpu": {
+        "maxNs": 115711,
+        "p50Ns": 94793,
+        "p95Ns": 101248,
+        "p99Ns": 110166,
+        "sampleCount": 1190
+      },
+      "equivalence": "notChecked",
+      "measuredFrames": 1190,
+      "pointsDrawn": 2512,
+      "pointsPerSeries": 1002,
+      "pointsSubmitted": 2512,
+      "policy": "minMax",
+      "refreshHz": 120,
+      "repeatIndex": 1,
+      "seriesCount": 8,
+      "warmupFrames": 120
+    },
+    {
+      "backend": "shape-path",
+      "chartKind": "strip-chart",
+      "cpu": {
+        "maxNs": 317543,
+        "p50Ns": 196583,
+        "p95Ns": 225710,
+        "p99Ns": 253582,
+        "sampleCount": 1190
+      },
+      "equivalence": "notChecked",
+      "measuredFrames": 1190,
+      "pointsDrawn": 2512,
+      "pointsPerSeries": 1002,
+      "pointsSubmitted": 2512,
+      "policy": "minMax",
+      "refreshHz": 120,
+      "repeatIndex": 2,
+      "seriesCount": 8,
+      "warmupFrames": 120
+    },
+    {
+      "backend": "shader",
+      "chartKind": "strip-chart",
+      "cpu": {
+        "maxNs": 1580959,
+        "p50Ns": 1378874,
+        "p95Ns": 1447626,
+        "p99Ns": 1491083,
+        "sampleCount": 1190
+      },
+      "equivalence": "notChecked",
+      "measuredFrames": 1190,
+      "pointsDrawn": 2512,
+      "pointsPerSeries": 1002,
+      "pointsSubmitted": 2512,
+      "policy": "minMax",
+      "refreshHz": 120,
+      "repeatIndex": 2,
+      "seriesCount": 8,
+      "warmupFrames": 120
+    },
+    {
+      "backend": "canvas",
+      "chartKind": "strip-chart",
+      "cpu": {
+        "maxNs": 430332,
+        "p50Ns": 299916,
+        "p95Ns": 328622,
+        "p99Ns": 370002,
+        "sampleCount": 1190
+      },
+      "drawCalls": 11,
+      "equivalence": "notChecked",
+      "measuredFrames": 1190,
+      "pointsDrawn": 2512,
+      "pointsPerSeries": 1002,
+      "pointsSubmitted": 2512,
+      "policy": "minMax",
+      "refreshHz": 120,
+      "repeatIndex": 2,
+      "seriesCount": 8,
+      "warmupFrames": 120
+    },
+    {
+      "backend": "swift-charts",
+      "chartKind": "strip-chart",
+      "cpu": {
+        "maxNs": 127040,
+        "p50Ns": 95834,
+        "p95Ns": 112543,
+        "p99Ns": 117915,
+        "sampleCount": 1190
+      },
+      "equivalence": "notChecked",
+      "measuredFrames": 1190,
+      "pointsDrawn": 2512,
+      "pointsPerSeries": 1002,
+      "pointsSubmitted": 2512,
+      "policy": "minMax",
+      "refreshHz": 120,
+      "repeatIndex": 2,
+      "seriesCount": 8,
+      "warmupFrames": 120
+    },
+    {
+      "backend": "core-image",
+      "chartKind": "strip-chart",
+      "cpu": {
+        "maxNs": 4244376,
+        "p50Ns": 4068915,
+        "p95Ns": 4160625,
+        "p99Ns": 4190874,
+        "sampleCount": 1190
+      },
+      "drawCalls": 1,
+      "equivalence": "notChecked",
+      "gpu": {
+        "maxNs": 123875,
+        "p50Ns": 118375,
+        "p95Ns": 118874,
+        "p99Ns": 121624,
+        "sampleCount": 1190
+      },
+      "measuredFrames": 1190,
+      "pointsPerSeries": 1002,
+      "pointsSubmitted": 2512,
+      "policy": "minMax",
+      "refreshHz": 120,
+      "repeatIndex": 2,
+      "seriesCount": 8,
+      "warmupFrames": 120
+    },
+    {
+      "backend": "scenekit",
+      "chartKind": "strip-chart",
+      "cpu": {
+        "maxNs": 1142792,
+        "p50Ns": 668291,
+        "p95Ns": 813417,
+        "p99Ns": 868793,
+        "sampleCount": 1190
+      },
+      "equivalence": "notChecked",
+      "measuredFrames": 1190,
+      "pointsDrawn": 2512,
+      "pointsPerSeries": 1002,
+      "pointsSubmitted": 2512,
+      "policy": "minMax",
+      "refreshHz": 120,
+      "repeatIndex": 2,
+      "seriesCount": 8,
+      "warmupFrames": 120
+    },
+    {
+      "backend": "core-animation",
+      "chartKind": "strip-chart",
+      "cpu": {
+        "maxNs": 676165,
+        "p50Ns": 326083,
+        "p95Ns": 591541,
+        "p99Ns": 625041,
+        "sampleCount": 1190
+      },
+      "equivalence": "notChecked",
+      "measuredFrames": 1190,
+      "pointsDrawn": 2512,
+      "pointsPerSeries": 1002,
+      "pointsSubmitted": 2512,
+      "policy": "minMax",
+      "refreshHz": 120,
+      "repeatIndex": 2,
+      "seriesCount": 8,
+      "warmupFrames": 120
+    },
+    {
+      "backend": "metal",
+      "chartKind": "strip-chart",
+      "cpu": {
+        "maxNs": 257371,
+        "p50Ns": 176000,
+        "p95Ns": 207455,
+        "p99Ns": 232625,
+        "sampleCount": 1190
+      },
+      "drawCalls": 10,
+      "equivalence": "notChecked",
+      "gpu": {
+        "maxNs": 568375,
+        "p50Ns": 289416,
+        "p95Ns": 543250,
+        "p99Ns": 553291,
+        "sampleCount": 1190
+      },
+      "measuredFrames": 1190,
+      "pointsDrawn": 2512,
+      "pointsPerSeries": 1002,
+      "pointsSubmitted": 2512,
+      "policy": "minMax",
+      "refreshHz": 120,
+      "repeatIndex": 2,
+      "seriesCount": 8,
+      "warmupFrames": 120
+    },
+    {
+      "backend": "metal-compute",
+      "chartKind": "strip-chart",
+      "cpu": {
+        "maxNs": 2924333,
+        "p50Ns": 1567914,
+        "p95Ns": 1773960,
+        "p99Ns": 2214666,
+        "sampleCount": 1190
+      },
+      "drawCalls": 10,
+      "equivalence": "notChecked",
+      "gpu": {
+        "maxNs": 1996999,
+        "p50Ns": 237999,
+        "p95Ns": 552291,
+        "p99Ns": 1278583,
+        "sampleCount": 1190
+      },
+      "measuredFrames": 1190,
+      "pointsDrawn": 2496,
+      "pointsPerSeries": 1002,
+      "pointsSubmitted": 7992,
+      "policy": "minMax",
+      "refreshHz": 120,
+      "repeatIndex": 2,
+      "seriesCount": 8,
+      "warmupFrames": 120
+    },
+    {
+      "backend": "core-image",
+      "chartKind": "strip-chart",
+      "cpu": {
+        "maxNs": 3551999,
+        "p50Ns": 3148709,
+        "p95Ns": 3222417,
+        "p99Ns": 3256623,
+        "sampleCount": 1190
+      },
+      "drawCalls": 1,
+      "equivalence": "notChecked",
+      "gpu": {
+        "maxNs": 175666,
+        "p50Ns": 118291,
+        "p95Ns": 121250,
+        "p99Ns": 122958,
+        "sampleCount": 1190
+      },
+      "measuredFrames": 1190,
+      "pointsPerSeries": 1002,
+      "pointsSubmitted": 2512,
+      "policy": "minMax",
+      "refreshHz": 120,
+      "repeatIndex": 3,
+      "seriesCount": 8,
+      "warmupFrames": 120
+    },
+    {
+      "backend": "scenekit",
+      "chartKind": "strip-chart",
+      "cpu": {
+        "maxNs": 973125,
+        "p50Ns": 669167,
+        "p95Ns": 816710,
+        "p99Ns": 865293,
+        "sampleCount": 1190
+      },
+      "equivalence": "notChecked",
+      "measuredFrames": 1190,
+      "pointsDrawn": 2512,
+      "pointsPerSeries": 1002,
+      "pointsSubmitted": 2512,
+      "policy": "minMax",
+      "refreshHz": 120,
+      "repeatIndex": 3,
+      "seriesCount": 8,
+      "warmupFrames": 120
+    },
+    {
+      "backend": "shader",
+      "chartKind": "strip-chart",
+      "cpu": {
+        "maxNs": 1810082,
+        "p50Ns": 1373958,
+        "p95Ns": 1429582,
+        "p99Ns": 1483334,
+        "sampleCount": 1190
+      },
+      "equivalence": "notChecked",
+      "measuredFrames": 1190,
+      "pointsDrawn": 2512,
+      "pointsPerSeries": 1002,
+      "pointsSubmitted": 2512,
+      "policy": "minMax",
+      "refreshHz": 120,
+      "repeatIndex": 3,
+      "seriesCount": 8,
+      "warmupFrames": 120
+    },
+    {
+      "backend": "swift-charts",
+      "chartKind": "strip-chart",
+      "cpu": {
+        "maxNs": 142375,
+        "p50Ns": 105500,
+        "p95Ns": 118499,
+        "p99Ns": 125250,
+        "sampleCount": 1190
+      },
+      "equivalence": "notChecked",
+      "measuredFrames": 1190,
+      "pointsDrawn": 2512,
+      "pointsPerSeries": 1002,
+      "pointsSubmitted": 2512,
+      "policy": "minMax",
+      "refreshHz": 120,
+      "repeatIndex": 3,
+      "seriesCount": 8,
+      "warmupFrames": 120
+    },
+    {
+      "backend": "metal",
+      "chartKind": "strip-chart",
+      "cpu": {
+        "maxNs": 246165,
+        "p50Ns": 171792,
+        "p95Ns": 199500,
+        "p99Ns": 222334,
+        "sampleCount": 1190
+      },
+      "drawCalls": 10,
+      "equivalence": "notChecked",
+      "gpu": {
+        "maxNs": 597000,
+        "p50Ns": 244124,
+        "p95Ns": 533374,
+        "p99Ns": 543833,
+        "sampleCount": 1190
+      },
+      "measuredFrames": 1190,
+      "pointsDrawn": 2512,
+      "pointsPerSeries": 1002,
+      "pointsSubmitted": 2512,
+      "policy": "minMax",
+      "refreshHz": 120,
+      "repeatIndex": 3,
+      "seriesCount": 8,
+      "warmupFrames": 120
+    },
+    {
+      "backend": "shape-path",
+      "chartKind": "strip-chart",
+      "cpu": {
+        "maxNs": 280250,
+        "p50Ns": 183669,
+        "p95Ns": 199127,
+        "p99Ns": 214250,
+        "sampleCount": 1190
+      },
+      "equivalence": "notChecked",
+      "measuredFrames": 1190,
+      "pointsDrawn": 2512,
+      "pointsPerSeries": 1002,
+      "pointsSubmitted": 2512,
+      "policy": "minMax",
+      "refreshHz": 120,
+      "repeatIndex": 3,
+      "seriesCount": 8,
+      "warmupFrames": 120
+    },
+    {
+      "backend": "canvas",
+      "chartKind": "strip-chart",
+      "cpu": {
+        "maxNs": 485792,
+        "p50Ns": 297792,
+        "p95Ns": 343002,
+        "p99Ns": 380584,
+        "sampleCount": 1190
+      },
+      "drawCalls": 11,
+      "equivalence": "notChecked",
+      "measuredFrames": 1190,
+      "pointsDrawn": 2512,
+      "pointsPerSeries": 1002,
+      "pointsSubmitted": 2512,
+      "policy": "minMax",
+      "refreshHz": 120,
+      "repeatIndex": 3,
+      "seriesCount": 8,
+      "warmupFrames": 120
+    },
+    {
+      "backend": "metal-compute",
+      "chartKind": "strip-chart",
+      "cpu": {
+        "maxNs": 2967833,
+        "p50Ns": 1555417,
+        "p95Ns": 1777374,
+        "p99Ns": 2047709,
+        "sampleCount": 1190
+      },
+      "drawCalls": 10,
+      "equivalence": "notChecked",
+      "gpu": {
+        "maxNs": 1842833,
+        "p50Ns": 237291,
+        "p95Ns": 550416,
+        "p99Ns": 1437749,
+        "sampleCount": 1190
+      },
+      "measuredFrames": 1190,
+      "pointsDrawn": 2496,
+      "pointsPerSeries": 1002,
+      "pointsSubmitted": 7992,
+      "policy": "minMax",
+      "refreshHz": 120,
+      "repeatIndex": 3,
+      "seriesCount": 8,
+      "warmupFrames": 120
+    },
+    {
+      "backend": "core-animation",
+      "chartKind": "strip-chart",
+      "cpu": {
+        "maxNs": 658584,
+        "p50Ns": 292626,
+        "p95Ns": 553960,
+        "p99Ns": 605543,
+        "sampleCount": 1190
+      },
+      "equivalence": "notChecked",
+      "measuredFrames": 1190,
+      "pointsDrawn": 2512,
+      "pointsPerSeries": 1002,
+      "pointsSubmitted": 2512,
+      "policy": "minMax",
+      "refreshHz": 120,
+      "repeatIndex": 3,
+      "seriesCount": 8,
+      "warmupFrames": 120
+    }
+  ],
+  "env": {
+    "batteryLevel": 0.8500000238418579,
+    "deviceModel": "iPhone17,1",
+    "isSimulator": false,
+    "lowPowerModeEnabled": false,
+    "maximumFramesPerSecond": 120,
+    "osVersion": "Version 26.5.2 (Build 23F84)",
+    "thermalStateAtEnd": "nominal",
+    "thermalStateAtStart": "nominal"
+  },
+  "run": {
+    "configuration": "release",
+    "gitDirty": false,
+    "gitSha": "374021b02b0665ea48c3ab8ba241daba8cd4b54f",
+    "id": "E5A5DC5A-D9B5-4F07-94DE-A4F66CE8BC46",
+    "startedAt": "2026-09-10T15:12:15Z",
+    "swiftVersion": "6.3.3",
+    "xcodeVersion": "26.6"
+  }
+}
