@@ -9,6 +9,8 @@ DerivedData/
 # and drifts from the manifest into every review.
 Demo/*.xcodeproj
 Demo/.build-demo/
+# A device build lands here: signed, unlike the simulator one, and just as regenerable.
+Demo/.build-device/
 
 fastlane/report.xml
 fastlane/Preview.html
