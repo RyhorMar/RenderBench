@@ -321,3 +321,40 @@ func noCaseIsMeasuredWhileTheWindowIsStillFilling() {
     #expect(everMeasuredAPartialWindow == false)
     #expect(storage.written.first?.cases.count == 2)
 }
+
+/// A case interrupted part-way is abandoned, and the repeat it belonged to does not survive.
+///
+/// The app leaving the foreground is what this is for: a backgrounded app gets no display link, so
+/// the case would wait forever at whatever frame it reached, and frames either side of such a gap
+/// were drawn by a process that was suspended and rewarmed in between.
+@MainActor
+@Test
+func aCaseInterruptedPartWayIsAbandonedAndItsRepeatDropped() {
+    let ticker = ManualTicker()
+    let scene = makeScene(ticker)
+    let storage = MemoryRunStorage()
+    let runner = BenchmarkRunner(scene: scene, storage: storage, conditions: { goodMachine })
+    scene.onFrame = { [weak runner] in runner?.frameDrawn() }
+
+    runner.start(backends: ["canvas", "shape-path"], repeats: 1, seed: 3)
+    var time = 0.0
+    for _ in 0..<40 {
+        if case .warmup = runner.phase { time += 1.0 / 120; ticker.fire(at: time) }
+        if case .measuring = runner.phase { time += 1.0 / 120; ticker.fire(at: time) }
+    }
+    runner.interrupted(reason: "the app left the foreground")
+
+    guard case .abandoned(let reason) = runner.phase else {
+        Issue.record("kept going as \(runner.phase)")
+        return
+    }
+    #expect(reason == "the app left the foreground")
+    #expect(storage.written.isEmpty)
+
+    // What the next process finds: a plan whose partly-measured repeat is dropped rather than
+    // stitched onto a fresh one.
+    let runnerAgain = BenchmarkRunner(scene: scene, storage: storage, conditions: { goodMachine })
+    scene.onFrame = { [weak runnerAgain] in runnerAgain?.frameDrawn() }
+    runnerAgain.resume()
+    #expect(runnerAgain.plan?.cases.isEmpty == true)
+}

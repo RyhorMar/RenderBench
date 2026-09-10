@@ -131,6 +131,23 @@ final class BenchmarkRunner {
         }
     }
 
+    /// Abandons the case in progress because something outside the run changed under it.
+    ///
+    /// The application leaving the foreground is the case this exists for. A backgrounded app gets
+    /// no display link, so the case would sit at whatever frame it reached and wait forever; and
+    /// were it to come back, the frames either side of the gap were drawn by a process that had
+    /// been suspended and rewarmed in between. Neither is one case. The repeat is dropped on the
+    /// next resume, which is the same thing that happens to a repeat whose process died.
+    func interrupted(reason: String) {
+        switch phase {
+        case .warmup, .measuring, .cooling:
+            scene.stop()
+            phase = .abandoned(reason: reason)
+        default:
+            break
+        }
+    }
+
     /// Call once a second while cooling down.
     func secondElapsed() {
         guard case .cooling(let left) = phase else { return }

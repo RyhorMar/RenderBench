@@ -14,6 +14,7 @@ struct RunScreen: View {
     @State private var conditions = RunConditions.current()
     @State private var shareURL: URL?
     @Environment(\.colorScheme) private var colorScheme
+    @Environment(\.scenePhase) private var scenePhase
 
     private let second = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
@@ -38,6 +39,9 @@ struct RunScreen: View {
             UIApplication.shared.isIdleTimerDisabled = false
         }
         .onChange(of: colorScheme, initial: true) { _, scheme in scene.isDark = scheme == .dark }
+        .onChange(of: scenePhase) { _, phase in
+            if phase != .active { runner?.interrupted(reason: "the app left the foreground") }
+        }
         .onReceive(second) { _ in
             runner?.secondElapsed()
             if isIdle { conditions = RunConditions.current() }
