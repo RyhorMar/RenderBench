@@ -273,3 +273,51 @@ func theRecordedRefreshRateIsTheDisplaysNotTheOneJustObserved() {
     #expect(Int(scene.observedHz.rounded()) == 40, "the scene saw \(scene.observedHz)")
     #expect(storage.written.first?.cases.first?.refreshHz == 120)
 }
+
+/// No case is ever measured while the data window is still filling.
+///
+/// The pipeline is primed with a whole window at rebuild, so this holds from the first frame —
+/// checked rather than assumed, because it was assumed the other way first. A measurement taken on
+/// a filling window spends part of its frames drawing a lighter chart than the one it claims to
+/// measure, and with a randomised order that would flatter a different backend in every repeat.
+@MainActor
+@Test
+func noCaseIsMeasuredWhileTheWindowIsStillFilling() {
+    let ticker = ManualTicker()
+    let scene = makeScene(ticker)
+    let storage = MemoryRunStorage()
+    let runner = BenchmarkRunner(scene: scene, storage: storage, conditions: { goodMachine })
+    scene.onFrame = { [weak runner] in runner?.frameDrawn() }
+
+    var plan = RunPlan.make(
+        id: "t", seed: 1, backends: ["canvas", "shape-path"], repeats: 1,
+        startedAt: Date(), thermalStateAtStart: .nominal,
+        warmupFrames: 2, measuredFrames: 20, cooldownSeconds: 1
+    )
+    plan.repeatIndex = 1
+    storage.plan = plan
+    runner.resume()
+
+    var time = 0.0
+    var everMeasuredAPartialWindow = false
+    for _ in 0..<20_000 {
+        switch runner.phase {
+        case .warmup:
+            time += 1.0 / 120
+            ticker.fire(at: time)
+        case .measuring:
+            if !scene.windowIsFull { everMeasuredAPartialWindow = true }
+            time += 1.0 / 120
+            ticker.fire(at: time)
+        case .cooling:
+            runner.secondElapsed()
+        default:
+            break
+        }
+        if case .wrote = runner.phase { break }
+        if case .abandoned = runner.phase { break }
+    }
+
+    #expect(everMeasuredAPartialWindow == false)
+    #expect(storage.written.first?.cases.count == 2)
+}

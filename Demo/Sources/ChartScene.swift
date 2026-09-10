@@ -71,6 +71,16 @@ final class ChartScene {
     /// measurement ran at.
     var pointsPerSeries: Int { provider.series.first?.count ?? 0 }
 
+    /// Whether the visible window holds as many samples as it ever will.
+    ///
+    /// True from the first frame, because ``rebuild()`` primes the pipeline with a whole window
+    /// rather than letting the ring fill over ten seconds. It is worth being able to ask: a
+    /// measurement taken while the window was still filling would spend part of its frames drawing
+    /// a lighter chart than the one it claims to measure, and with a randomised backend order that
+    /// would flatter a different backend in every repeat. Nothing but a test asks — the invariant
+    /// is what the answer is for.
+    var windowIsFull: Bool { pointsPerSeries >= Int(sourceRateHz * windowSeconds) }
+
     /// Identifies the current data source without exposing it. `SeriesCollectionProvider` is a
     /// value type, so two instances with equal contents would compare equal — of no use to a test
     /// that must tell "the same source" apart from "a new one that happens to look the same".
