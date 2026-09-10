@@ -30,5 +30,17 @@
 	     120 Hz measurement in this project would silently be a 60 Hz measurement. -->
 	<key>CADisableMinimumFrameDuration</key>
 	<true/>
+	<!-- File names, not PostScript names: a face absent from this list is not registered, and
+	     `UIFont(name:)` then returns nil and every label silently falls back to the system font.
+	     `AppFont` holds the PostScript names, which are abbreviated and do not match these. -->
+	<key>UIAppFonts</key>
+	<array>
+		<string>IBMPlexSans-Regular.ttf</string>
+		<string>IBMPlexSans-Medium.ttf</string>
+		<string>IBMPlexSans-SemiBold.ttf</string>
+		<string>IBMPlexMono-Regular.ttf</string>
+		<string>IBMPlexMono-Medium.ttf</string>
+		<string>IBMPlexMono-SemiBold.ttf</string>
+	</array>
 </dict>
 </plist>
