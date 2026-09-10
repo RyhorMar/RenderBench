@@ -37,6 +37,10 @@ enum AppMetrics {
         static let row = EdgeInsets(top: 10, leading: 13, bottom: 10, trailing: 13)
         /// A provenance chip, which sits beside a number rather than containing a block.
         static let chip = EdgeInsets(top: 3, leading: 8, bottom: 3, trailing: 8)
+        /// A chip that is a control rather than a label, and so has to be worth aiming at. Not
+        /// `chip` above: three points of vertical padding around a 12 pt name is an 18 pt target,
+        /// and a row of nine of those is a row nobody can hit.
+        static let controlChip = EdgeInsets(top: 6, leading: 10, bottom: 6, trailing: 10)
     }
 
     /// Every size that appears on the app's screens, largest first.

@@ -68,12 +68,7 @@ struct CompareScreen: View {
 
     private var controls: some View {
         VStack(spacing: 10) {
-            Picker("Backend", selection: backendSelection) {
-                ForEach(Catalogue.renderers) { entry in
-                    Text(entry.descriptor.displayName).tag(entry.id)
-                }
-            }
-            .pickerStyle(.segmented)
+            BackendChipRow(rows: Catalogue.rows, selection: backendSelection)
 
             Picker("Signal", selection: $scene.scenario) {
                 Text(Scenario.eightSeries.rawValue).tag(Scenario.eightSeries)
