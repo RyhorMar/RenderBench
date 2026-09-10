@@ -43,6 +43,21 @@ enum AppFont {
         return .custom(monoName(for: weight), fixedSize: scaled)
     }
 
+    /// A text face that scales without a ceiling, mapped to the system style whose rhythm this role
+    /// follows. Text may grow as far as the reader asks: it wraps, where a number in a tile does not.
+    static func sans(_ size: CGFloat, relativeTo style: Font.TextStyle,
+                     weight: Font.Weight = .regular) -> Font {
+        .custom(sansName(for: weight), size: size, relativeTo: style)
+    }
+
+    static func sansName(for weight: Font.Weight) -> String {
+        switch weight {
+        case .semibold, .bold, .heavy, .black: sansSemiBold
+        case .medium: sansMedium
+        default: sansRegular
+        }
+    }
+
     static func monoName(for weight: Font.Weight) -> String {
         switch weight {
         case .semibold, .bold, .heavy, .black: monoSemiBold

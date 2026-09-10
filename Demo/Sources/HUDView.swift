@@ -31,14 +31,14 @@ struct HUDView: View {
             // rasterisation the backend could time. Adding them into a single figure and calling
             // it the frame cost is what this overlay did until the draw pass was measured at all.
             if let statistics = scene.statistics {
-                row("prep p50", HUDFormat.milliseconds(statistics.p50Ns))
-                row("prep p95", HUDFormat.milliseconds(statistics.p95Ns))
+                row("prep p50", Reading.milliseconds(statistics.p50Ns))
+                row("prep p95", Reading.milliseconds(statistics.p95Ns))
             }
             row("draw p50", rasterValue(\.p50Ns))
             row("draw p95", rasterValue(\.p95Ns))
             row("gpu p50", gpuValue(\.p50Ns))
             row("gpu p95", gpuValue(\.p95Ns))
-            row("points", HUDFormat.count(scene.pointsDrawn))
+            row("points", Reading.count(scene.pointsDrawn))
             row("dropped", "\(scene.droppedFrames)")
             // A refused series is shown, not absorbed. A chart quietly missing a curve is the one
             // failure mode a reader cannot detect from the picture.
@@ -56,13 +56,13 @@ struct HUDView: View {
     /// a zero here would read as "the fastest backend measured" rather than "not measured at all".
     private func rasterValue(_ path: KeyPath<FrameStatistics, UInt64>) -> String {
         let raster = descriptor.reportsRasterTime ? scene.rasterStatistics : nil
-        return HUDFormat.milliseconds(raster?[keyPath: path])
+        return Reading.milliseconds(raster?[keyPath: path])
     }
 
     /// See ``rasterValue(_:)``; same reasoning, the GPU-timestamp column.
     private func gpuValue(_ path: KeyPath<FrameStatistics, UInt64>) -> String {
         let gpu = descriptor.reportsGPUTime ? scene.gpuStatistics : nil
-        return HUDFormat.milliseconds(gpu?[keyPath: path])
+        return Reading.milliseconds(gpu?[keyPath: path])
     }
 
     /// `scene.policy` names what the picker selected, not what actually reached the backend: for
@@ -83,28 +83,5 @@ struct HUDView: View {
             Text(name).foregroundStyle(.secondary)
             Text(value).monospacedDigit()
         }
-    }
-}
-
-/// How a reading is written, and there is one answer for the whole overlay.
-///
-/// An absent value is the literal word `nil`, not a dash. A dash does not explain itself: a reader
-/// cannot tell "this backend cannot report it" from "the row is a separator" from "somebody left a
-/// placeholder". `nil` is the same word the code uses for the same thing, and it is the same
-/// argument by which this project writes an absent counter as absent rather than as zero.
-///
-/// Zero is not absence and is never rewritten: a backend that honestly counted zero dropped frames
-/// says `0`.
-enum HUDFormat {
-    static let absent = "nil"
-
-    static func count(_ value: Int?) -> String {
-        guard let value else { return absent }
-        return "\(value)"
-    }
-
-    static func milliseconds(_ nanoseconds: UInt64?) -> String {
-        guard let nanoseconds else { return absent }
-        return String(format: "%.2f ms", Double(nanoseconds) / 1_000_000)
     }
 }
