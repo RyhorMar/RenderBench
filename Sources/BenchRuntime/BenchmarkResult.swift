@@ -97,6 +97,15 @@ public struct RunMetadata: Codable, Sendable, Equatable {
     /// Whether the working tree had uncommitted changes. A dirty run is recorded, not refused —
     /// but the reader gets to know.
     public var gitDirty: Bool
+    /// Seed the randomised backend order was generated from.
+    ///
+    /// The procedure asks for the order to be randomised **and recorded**. The order itself is
+    /// recoverable from the sequence of cases; the seed is what lets a reader generate that same
+    /// order again rather than take the file's word that it was not chosen to flatter somebody.
+    ///
+    /// `nil` for a run written before this was kept. Absent, never zero: zero is a seed like any
+    /// other, and recording it would name an order that was never used.
+    public var seed: UInt64?
     public var configuration: BuildConfiguration
     public var swiftVersion: String
     public var xcodeVersion: String?
@@ -106,6 +115,7 @@ public struct RunMetadata: Codable, Sendable, Equatable {
         startedAt: Date,
         gitSha: String,
         gitDirty: Bool,
+        seed: UInt64? = nil,
         configuration: BuildConfiguration,
         swiftVersion: String,
         xcodeVersion: String? = nil
@@ -114,6 +124,7 @@ public struct RunMetadata: Codable, Sendable, Equatable {
         self.startedAt = startedAt
         self.gitSha = gitSha
         self.gitDirty = gitDirty
+        self.seed = seed
         self.configuration = configuration
         self.swiftVersion = swiftVersion
         self.xcodeVersion = xcodeVersion
@@ -127,6 +138,7 @@ public struct RunMetadata: Codable, Sendable, Equatable {
         startedAt = try container.decode(Date.self, forKey: .startedAt)
         gitSha = try container.decode(String.self, forKey: .gitSha)
         gitDirty = try container.decode(Bool.self, forKey: .gitDirty)
+        seed = try container.decodeIfPresent(UInt64.self, forKey: .seed)
         configuration = try container.decode(BuildConfiguration.self, forKey: .configuration)
         swiftVersion = try container.decode(String.self, forKey: .swiftVersion)
         xcodeVersion = try container.decodeIfPresent(String.self, forKey: .xcodeVersion)

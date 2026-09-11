@@ -596,3 +596,33 @@ func theAchievedRateExcludesTheWarmUp() {
     #expect((38.0...42.0).contains(achieved),
             "a window including the warm-up would read about 20; read \(achieved)")
 }
+
+/// The seed the order came from reaches the file, so the order can be generated again.
+///
+/// The plan holds it while the run is in progress and is deleted when the file is written. Without
+/// this the seed dies with the plan, and "randomised, and here is the order used" becomes a claim
+/// nobody can re-derive.
+@MainActor
+@Test
+func theSeedTheOrderCameFromReachesTheFile() {
+    let ticker = ManualTicker()
+    let scene = makeScene(ticker)
+    let storage = MemoryRunStorage()
+    let runner = BenchmarkRunner(scene: scene, storage: storage, conditions: { goodMachine })
+    scene.onFrame = { [weak runner] in runner?.frameDrawn(at: scene.lastFrameTimestamp) }
+
+    runner.start(backends: ["canvas", "shape-path"], repeats: 3, seed: 4_242_424_242)
+    _ = drive(runner, ticker)
+
+    #expect(storage.written.first?.run.seed == 4_242_424_242)
+
+    // And the order in the file is the one that seed produces, not merely some order.
+    let expected = RunPlan.make(
+        id: "x", seed: 4_242_424_242, backends: ["canvas", "shape-path"], repeats: 3,
+        startedAt: Date(), thermalStateAtStart: .nominal
+    )
+    let filed = (storage.written.first?.cases ?? [])
+        .filter { $0.repeatIndex == 1 }
+        .map(\.backend)
+    #expect(filed == expected.order[0], "filed \(filed) against \(expected.order[0])")
+}

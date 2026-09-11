@@ -44,6 +44,11 @@
           "type": "boolean",
           "description": "Whether the working tree had uncommitted changes. A dirty run is recorded, not refused — but the reader gets to know."
         },
+        "seed": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Seed the randomised backend order was generated from. Absent for a run written before this was kept; zero is a seed like any other, so absence is how 'nobody recorded it' is said."
+        },
         "configuration": {
           "enum": [
             "debug",

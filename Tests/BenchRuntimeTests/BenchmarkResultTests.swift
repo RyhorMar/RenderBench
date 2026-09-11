@@ -397,3 +397,41 @@ func theSchemaDeclaresTheAchievedRate() throws {
     let properties = try #require(item["properties"] as? [String: Any])
     #expect(properties["achievedHz"] != nil, "the model carries a field the schema does not declare")
 }
+
+// MARK: The order the backends ran in
+
+/// The seed the randomised order came from travels with the run.
+///
+/// "Randomise the order and record the one used" is half a procedure without it. The order itself
+/// is recoverable from the sequence of cases, but the seed is what lets anyone generate that same
+/// order again and check it was not chosen to flatter somebody.
+@Test
+func aRunCarriesTheSeedItsOrderCameFrom() throws {
+    let withSeed = validRun.replacingOccurrences(
+        of: "\"gitDirty\": false,",
+        with: "\"gitDirty\": false, \"seed\": 8765432109876543210,"
+    )
+    let result = try decode(json(run: withSeed))
+    #expect(result.run.seed == 8_765_432_109_876_543_210)
+}
+
+/// A run written before the seed was recorded says nothing rather than zero.
+///
+/// Zero is a seed like any other. Recording it for a run whose seed nobody kept would name an
+/// order that was never used.
+@Test
+func aRunWithoutASeedDecodesAsAbsentNotZero() throws {
+    let result = try decode(json())
+    #expect(result.run.seed == nil)
+    #expect(result.run.seed != 0)
+}
+
+/// The schema declares it, so an external validator sees it too.
+@Test
+func theSchemaDeclaresTheSeed() throws {
+    let data = try Data(contentsOf: URL(fileURLWithPath: "Benchmarks/schema.json"))
+    let schema = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+    let run = try #require((schema["properties"] as? [String: Any])?["run"] as? [String: Any])
+    let properties = try #require(run["properties"] as? [String: Any])
+    #expect(properties["seed"] != nil, "the model carries a field the schema does not declare")
+}

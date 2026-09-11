@@ -149,6 +149,7 @@ enum ResultExport {
                 startedAt: plan.startedAt,
                 gitSha: BuildInfo.gitSha,
                 gitDirty: BuildInfo.gitDirty,
+                seed: plan.seed,
                 configuration: isDebugBuild ? .debug : .release,
                 swiftVersion: BuildInfo.swiftVersion,
                 xcodeVersion: BuildInfo.xcodeVersion
