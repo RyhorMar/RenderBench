@@ -357,3 +357,43 @@ func neitherRuleAppliesOutsideTheResultsDirectory() throws {
     let result = try decode(json(cases: exportShapedCase))
     #expect(throws: Never.self) { try result.validate(isStoredResult: false) }
 }
+
+// MARK: The rate the run actually got
+
+/// The rate asked for and the rate got are different quantities, and the file carries both.
+///
+/// `refreshHz` is what the display can do. It said 120 on a run where a backend sustained 73, and
+/// it was not lying — it answers a different question. Nothing in this format answered the other
+/// one until now, and no system property answers it either: it has to be counted.
+@Test
+func aCaseCarriesTheRateItActuallyAchieved() throws {
+    let withAchieved = validCase.replacingOccurrences(
+        of: "\"refreshHz\": 120,",
+        with: "\"refreshHz\": 120, \"achievedHz\": 73.4,"
+    )
+    let result = try decode(json(cases: withAchieved))
+    #expect(result.cases[0].achievedHz == 73.4)
+    #expect(result.cases[0].refreshHz == 120, "the display's rate is untouched by the one achieved")
+}
+
+/// A run taken before the rate was counted says nothing rather than zero.
+///
+/// Absent is the honest reading for a file this project wrote before it could count: zero would
+/// claim the app drew no frames, which is the opposite of what happened.
+@Test
+func aCaseWithoutAnAchievedRateDecodesAsAbsentNotZero() throws {
+    let result = try decode(json())
+    #expect(result.cases[0].achievedHz == nil)
+    #expect(result.cases[0].achievedHz != 0)
+}
+
+/// The schema declares it, so an external validator sees it too.
+@Test
+func theSchemaDeclaresTheAchievedRate() throws {
+    let data = try Data(contentsOf: URL(fileURLWithPath: "Benchmarks/schema.json"))
+    let schema = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+    let cases = try #require((schema["properties"] as? [String: Any])?["cases"] as? [String: Any])
+    let item = try #require(cases["items"] as? [String: Any])
+    let properties = try #require(item["properties"] as? [String: Any])
+    #expect(properties["achievedHz"] != nil, "the model carries a field the schema does not declare")
+}

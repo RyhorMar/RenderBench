@@ -225,6 +225,16 @@ public struct BenchmarkCase: Codable, Sendable, Equatable {
     public var seriesCount: Int
     public var pointsPerSeries: Int
     public var refreshHz: Int
+    /// Frames per second the run actually got, counted over the measured window.
+    ///
+    /// Not ``refreshHz``, which is what the display can do. The two differ whenever a backend
+    /// cannot keep up: measured on an iPhone 16 Pro, one sustained 73 frames a second on a 120 Hz
+    /// display. No system property reports this, and the accessibility setting that limits the
+    /// frame rate cannot be read from inside the process at all, so it is counted or it is absent.
+    ///
+    /// `nil` for a run taken before this was counted. Absent, never zero: zero would claim the app
+    /// drew nothing.
+    public var achievedHz: Double?
     public var policy: DownsamplePolicy
     /// Frames discarded before measurement began.
     public var warmupFrames: Int
@@ -263,6 +273,7 @@ public struct BenchmarkCase: Codable, Sendable, Equatable {
         seriesCount: Int,
         pointsPerSeries: Int,
         refreshHz: Int,
+        achievedHz: Double? = nil,
         policy: DownsamplePolicy,
         warmupFrames: Int,
         measuredFrames: Int,
@@ -284,6 +295,7 @@ public struct BenchmarkCase: Codable, Sendable, Equatable {
         self.seriesCount = seriesCount
         self.pointsPerSeries = pointsPerSeries
         self.refreshHz = refreshHz
+        self.achievedHz = achievedHz
         self.policy = policy
         self.warmupFrames = warmupFrames
         self.measuredFrames = measuredFrames

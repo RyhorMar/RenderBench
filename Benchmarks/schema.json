@@ -159,6 +159,11 @@
             "type": "integer",
             "minimum": 1
           },
+          "achievedHz": {
+            "type": "number",
+            "exclusiveMinimum": 0,
+            "description": "Frames per second the run actually got, counted over the measured window. Absent for a run taken before this was counted; never zero, which would claim the app drew nothing."
+          },
           "policy": {
             "enum": [
               "minMax",

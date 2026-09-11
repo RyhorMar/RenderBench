@@ -184,6 +184,13 @@ final class ChartScene {
         renderer.suspend()
     }
 
+    /// Timestamp of the most recent frame this scene drew, on the host clock.
+    ///
+    /// The runner counts the rate a case achieved from these rather than from ``observedHz``:
+    /// that one is a one-second window, and a case is measured over its own window, which is
+    /// longer and is the one the file reports.
+    private(set) var lastFrameTimestamp: Double = 0
+
     /// Called once for every frame this scene actually draws.
     ///
     /// The benchmark runner counts frames rather than seconds, and this is where it counts them:
@@ -308,6 +315,7 @@ final class ChartScene {
 
         meter.record(timestamp: tick.timestamp)
         observedHz = meter.rate
+        lastFrameTimestamp = tick.timestamp
 
         guard let plan = pipeline.advance(tick: tick) else { return }
         produce(upTo: plan.samplesDue)

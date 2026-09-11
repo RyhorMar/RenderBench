@@ -45,6 +45,11 @@ final class BenchmarkRunner {
     private(set) var phase: Phase = .idle
     private(set) var plan: RunPlan?
 
+    /// First and last frame of the case being measured, on the host clock. The pair is what makes
+    /// the achieved rate a property of the case rather than of the last second before it ended.
+    private var measuredFrom: Double = 0
+    private var measuredUntil: Double = 0
+
     private let scene: ChartScene
     private let storage: any RunStorage
     private let conditions: @MainActor () -> RunConditions
@@ -110,17 +115,23 @@ final class BenchmarkRunner {
         beginNextCase()
     }
 
-    /// Call once per frame the scene draws.
-    func frameDrawn() {
+    /// Call once per frame the scene draws, with the moment it was drawn.
+    ///
+    /// - Parameter timestamp: `FrameTick.timestamp` of that frame. The case's achieved rate is
+    ///   counted from the first and last of these, so it covers the measured window rather than
+    ///   whatever the last second happened to hold.
+    func frameDrawn(at timestamp: Double) {
         switch phase {
         case .warmup(let backend, let left):
             if left > 1 {
                 phase = .warmup(backend: backend, framesLeft: left - 1)
             } else {
                 scene.resetMetrics()
+                measuredFrom = timestamp
                 phase = .measuring(backend: backend, framesLeft: plan?.measuredFrames ?? 0)
             }
         case .measuring(let backend, let left):
+            measuredUntil = timestamp
             if left > 1 {
                 phase = .measuring(backend: backend, framesLeft: left - 1)
             } else {
@@ -159,9 +170,11 @@ final class BenchmarkRunner {
     }
 
     private func finish(_ backend: String) {
+        let span = measuredUntil - measuredFrom
         guard var current = plan, let measured = ResultExport.measuredCase(
             from: scene,
             refreshHz: conditions().displayMaximumFramesPerSecond,
+            achievedHz: span > 0 ? Double(current.measuredFrames - 1) / span : nil,
             warmupFrames: current.warmupFrames,
             repeatIndex: current.repeatIndex
         ) else {

@@ -106,8 +106,10 @@ enum ResultExport {
     ///   sustaining 73 frames a second reports 120 as readily as 11, and this field means "the
     ///   rate the frames were being asked for". The rate actually achieved is a different
     ///   quantity, and this format has no field for it.
-    static func measuredCase(from scene: ChartScene, refreshHz: Int, warmupFrames: Int,
-                             repeatIndex: Int) -> BenchmarkCase? {
+    /// - Parameter achievedHz: counted by the runner over the case's own measured window. `nil`
+    ///   when the window had no span, which is the honest answer rather than a rate of zero.
+    static func measuredCase(from scene: ChartScene, refreshHz: Int, achievedHz: Double?,
+                             warmupFrames: Int, repeatIndex: Int) -> BenchmarkCase? {
         guard let cpu = scene.statistics else { return nil }
         return BenchmarkCase(
             chartKind: .stripChart,
@@ -115,6 +117,7 @@ enum ResultExport {
             seriesCount: scene.seriesCount,
             pointsPerSeries: scene.pointsPerSeries,
             refreshHz: refreshHz,
+            achievedHz: achievedHz,
             policy: scene.policy,
             warmupFrames: warmupFrames,
             measuredFrames: cpu.sampleCount,

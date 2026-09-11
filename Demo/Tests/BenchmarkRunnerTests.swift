@@ -82,7 +82,7 @@ func aRunProducesOneFileWithEveryBackendInEveryRepeat() {
     let scene = makeScene(ticker)
     let storage = MemoryRunStorage()
     let runner = BenchmarkRunner(scene: scene, storage: storage, conditions: { goodMachine })
-    scene.onFrame = { [weak runner] in runner?.frameDrawn() }
+    scene.onFrame = { [weak runner] in runner?.frameDrawn(at: scene.lastFrameTimestamp) }
 
     runner.start(backends: ["canvas", "shape-path"], repeats: 3, seed: 7)
     let relaunches = drive(runner, ticker)
@@ -111,7 +111,7 @@ func theWarmupFramesAreNotAmongTheMeasuredOnes() {
     let scene = makeScene(ticker)
     let storage = MemoryRunStorage()
     let runner = BenchmarkRunner(scene: scene, storage: storage, conditions: { goodMachine })
-    scene.onFrame = { [weak runner] in runner?.frameDrawn() }
+    scene.onFrame = { [weak runner] in runner?.frameDrawn(at: scene.lastFrameTimestamp) }
 
     var plan = RunPlan.make(
         id: "t", seed: 1, backends: ["canvas"], repeats: 1,
@@ -159,7 +159,7 @@ func aRunThatEndsOnAViolationIsNotFiled() {
     let storage = MemoryRunStorage()
     let machine = Box(goodMachine)
     let runner = BenchmarkRunner(scene: scene, storage: storage, conditions: { machine.value })
-    scene.onFrame = { [weak runner] in runner?.frameDrawn() }
+    scene.onFrame = { [weak runner] in runner?.frameDrawn(at: scene.lastFrameTimestamp) }
 
     var plan = RunPlan.make(
         id: "t", seed: 1, backends: ["canvas"], repeats: 1,
@@ -209,7 +209,7 @@ func aHalfFinishedRepeatIsDiscardedOnResume() {
     let scene = makeScene(ticker)
     let storage = MemoryRunStorage()
     let runner = BenchmarkRunner(scene: scene, storage: storage, conditions: { goodMachine })
-    scene.onFrame = { [weak runner] in runner?.frameDrawn() }
+    scene.onFrame = { [weak runner] in runner?.frameDrawn(at: scene.lastFrameTimestamp) }
 
     var plan = RunPlan.make(
         id: "t", seed: 1, backends: ["canvas", "shape-path"], repeats: 1,
@@ -247,7 +247,7 @@ func theRecordedRefreshRateIsTheDisplaysNotTheOneJustObserved() {
     let scene = makeScene(ticker)
     let storage = MemoryRunStorage()
     let runner = BenchmarkRunner(scene: scene, storage: storage, conditions: { goodMachine })
-    scene.onFrame = { [weak runner] in runner?.frameDrawn() }
+    scene.onFrame = { [weak runner] in runner?.frameDrawn(at: scene.lastFrameTimestamp) }
 
     var plan = RunPlan.make(
         id: "t", seed: 1, backends: ["canvas"], repeats: 1,
@@ -294,7 +294,7 @@ func noCaseIsMeasuredWhileTheWindowIsStillFilling() {
     let scene = makeScene(ticker)
     let storage = MemoryRunStorage()
     let runner = BenchmarkRunner(scene: scene, storage: storage, conditions: { goodMachine })
-    scene.onFrame = { [weak runner] in runner?.frameDrawn() }
+    scene.onFrame = { [weak runner] in runner?.frameDrawn(at: scene.lastFrameTimestamp) }
 
     var plan = RunPlan.make(
         id: "t", seed: 1, backends: ["canvas", "shape-path"], repeats: 1,
@@ -341,7 +341,7 @@ func aCaseInterruptedPartWayIsAbandonedAndItsRepeatDropped() {
     let scene = makeScene(ticker)
     let storage = MemoryRunStorage()
     let runner = BenchmarkRunner(scene: scene, storage: storage, conditions: { goodMachine })
-    scene.onFrame = { [weak runner] in runner?.frameDrawn() }
+    scene.onFrame = { [weak runner] in runner?.frameDrawn(at: scene.lastFrameTimestamp) }
 
     runner.start(backends: ["canvas", "shape-path"], repeats: 1, seed: 3)
     var time = 0.0
@@ -361,7 +361,7 @@ func aCaseInterruptedPartWayIsAbandonedAndItsRepeatDropped() {
     // What the next process finds: a plan whose partly-measured repeat is dropped rather than
     // stitched onto a fresh one.
     let runnerAgain = BenchmarkRunner(scene: scene, storage: storage, conditions: { goodMachine })
-    scene.onFrame = { [weak runnerAgain] in runnerAgain?.frameDrawn() }
+    scene.onFrame = { [weak runnerAgain] in runnerAgain?.frameDrawn(at: scene.lastFrameTimestamp) }
     runnerAgain.resume()
     #expect(runnerAgain.plan?.cases.isEmpty == true)
 }
@@ -488,8 +488,111 @@ func aBackendThatTimesItsOwnDrawPassGetsThatIntoTheFile() {
 
     #expect(scene.rasterStatistics != nil, "the scene never collected a raster time to begin with")
     let measured = ResultExport.measuredCase(
-        from: scene, refreshHz: 120, warmupFrames: 120, repeatIndex: 1
+        from: scene, refreshHz: 120, achievedHz: 119.9, warmupFrames: 120, repeatIndex: 1
     )
     #expect(measured?.raster != nil, "the case dropped the raster time the scene had")
     #expect(measured?.raster?.p50Ns == 900_000)
+}
+
+/// The case records the rate the run actually got, over its own measured window.
+///
+/// Not the last second, and not the display's rate: a case measured at forty frames a second on a
+/// 120 Hz display has to say forty. The two numbers answering different questions in one row is
+/// the whole point of carrying both.
+@MainActor
+@Test
+func theCaseRecordsTheRateItActuallyAchieved() {
+    let ticker = ManualTicker()
+    let scene = makeScene(ticker)
+    let storage = MemoryRunStorage()
+    let runner = BenchmarkRunner(scene: scene, storage: storage, conditions: { goodMachine })
+    scene.onFrame = { [weak runner] in runner?.frameDrawn(at: scene.lastFrameTimestamp) }
+
+    var plan = RunPlan.make(
+        id: "t", seed: 1, backends: ["canvas"], repeats: 1,
+        startedAt: Date(), thermalStateAtStart: .nominal,
+        warmupFrames: 2, measuredFrames: 200, cooldownSeconds: 1
+    )
+    plan.repeatIndex = 1
+    storage.plan = plan
+    runner.resume()
+
+    var time = 0.0
+    for _ in 0..<3_000 {
+        switch runner.phase {
+        case .warmup, .measuring:
+            time += 1.0 / 40
+            ticker.fire(at: time)
+        case .cooling:
+            runner.secondElapsed()
+        default:
+            break
+        }
+        if case .wrote = runner.phase { break }
+    }
+
+    let measured = storage.written.first?.cases.first
+    #expect(measured?.refreshHz == 120, "the display's rate is what the machine says")
+    let achieved = measured?.achievedHz ?? 0
+    #expect((38.0...42.0).contains(achieved), "achieved \(String(describing: measured?.achievedHz))")
+}
+
+/// An absent achieved rate stays absent rather than becoming a zero.
+///
+/// Zero would claim the run drew no frames. In this format an absent reading means "cannot
+/// report", and the difference is the whole reason the field is optional.
+@MainActor
+@Test
+func anAbsentAchievedRateIsNotTurnedIntoZero() {
+    let ticker = ManualTicker()
+    let scene = ChartScene(renderer: RasterReportingRenderer(), ticker: ticker)
+    scene.chartSize = CGSize(width: 400, height: 200)
+    scene.start()
+    for index in 0..<40 { ticker.fire(at: Double(index) / 120) }
+
+    let measured = ResultExport.measuredCase(
+        from: scene, refreshHz: 120, achievedHz: nil, warmupFrames: 120, repeatIndex: 1
+    )
+    #expect(measured?.achievedHz == nil, "read \(String(describing: measured?.achievedHz))")
+}
+
+/// The achieved rate covers the measured window and not the warm-up before it.
+///
+/// Driven at forty frames a second with a warm-up as long as the measurement: a window that began
+/// at the first frame of the case rather than the first measured one would halve the answer.
+@MainActor
+@Test
+func theAchievedRateExcludesTheWarmUp() {
+    let ticker = ManualTicker()
+    let scene = makeScene(ticker)
+    let storage = MemoryRunStorage()
+    let runner = BenchmarkRunner(scene: scene, storage: storage, conditions: { goodMachine })
+    scene.onFrame = { [weak runner] in runner?.frameDrawn(at: scene.lastFrameTimestamp) }
+
+    var plan = RunPlan.make(
+        id: "t", seed: 1, backends: ["canvas"], repeats: 1,
+        startedAt: Date(), thermalStateAtStart: .nominal,
+        warmupFrames: 200, measuredFrames: 200, cooldownSeconds: 1
+    )
+    plan.repeatIndex = 1
+    storage.plan = plan
+    runner.resume()
+
+    var time = 0.0
+    for _ in 0..<3_000 {
+        switch runner.phase {
+        case .warmup, .measuring:
+            time += 1.0 / 40
+            ticker.fire(at: time)
+        case .cooling:
+            runner.secondElapsed()
+        default:
+            break
+        }
+        if case .wrote = runner.phase { break }
+    }
+
+    let achieved = storage.written.first?.cases.first?.achievedHz ?? 0
+    #expect((38.0...42.0).contains(achieved),
+            "a window including the warm-up would read about 20; read \(achieved)")
 }

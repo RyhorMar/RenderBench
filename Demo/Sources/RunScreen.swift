@@ -141,7 +141,7 @@ struct RunScreen: View {
         conditions = RunConditions.current()
         guard runner == nil, let storage = FileRunStorage() else { return }
         let made = BenchmarkRunner(scene: scene, storage: storage)
-        scene.onFrame = { [weak made] in made?.frameDrawn() }
+        scene.onFrame = { [weak made] in made?.frameDrawn(at: scene.lastFrameTimestamp) }
         runner = made
         if ProcessInfo.processInfo.arguments.contains(RootView.autoStartArgument) { start() }
     }
