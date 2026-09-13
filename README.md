@@ -3,7 +3,7 @@
 Nine ways to draw the same realtime chart on iOS, on the same data, with measured frame time
 and a documented failure point for each.
 
-**Status: nine backends of nine, and none measured on a device yet.** Canvas, Core Animation and
+**Status: nine backends of nine, measured once — one run, on one device.** Canvas, Core Animation and
 Metal draw through their own device APIs. Swift Charts and Shape + Path are SwiftUI's own retained
 view types. Core Image delivers a CPU-rasterised frame through a GPU filter pipeline. SceneKit puts
 the chart in a 3D scene, deliberately — its one-pixel line primitive cannot express a stroke width,
@@ -66,8 +66,8 @@ palette. Not built for any backend: crossover fill, an uncertainty band, a log a
 axis, annotations, a synchronised cursor, zoom/pan, delta-loading into a GPU buffer, accessibility,
 a data-age indicator. Every one of those is added once, across all nine backends at once, rather
 than per backend — see [`Docs/adr/0002-renderer-contract.md`](Docs/adr/0002-renderer-contract.md).
-Oil & gas chart types and out-of-core data are not started. None of it starts before the first
-measurement on a device.
+Oil & gas chart types and out-of-core data are not started. None of it started before the first
+measurement on a device, and that measurement is now in `Benchmarks/results/`.
 
 ## Evidence
 
