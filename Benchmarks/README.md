@@ -68,6 +68,12 @@ Published: nearest-rank p50, p95, p99 and max in three separate columns — `cpu
 and geometry building, `raster` for the backend's own drawing, `gpu` for GPU execution — plus the
 missed-deadline ratio and the full environment.
 
+**The stored run of 10 September 2026 carries neither.** `raster` is absent in all twenty-seven of
+its cases — the column was added to the runner after that run — and `missedDeadlineRatio` is absent
+in all of them because no backend of the nine reports a presentation time, without which a missed
+deadline is not knowable. Both fields are optional in the schema, so the guard accepts a file
+without them; the format describing a column is not the same as a run having one.
+
 **The three are never added together into one frame time.** A backend that reports no `raster` and
 no `gpu` has not been measured as a rendering method: its drawing happened somewhere this process
 cannot see. Reading its `cpu` column as a frame cost is the mistake this format exists to prevent.
