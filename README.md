@@ -13,9 +13,11 @@ CPU. Every backend's rasterisation is reported when the method can observe it at
 a fabricated zero, when it cannot. See [`Docs/adr/0002-renderer-contract.md`](Docs/adr/0002-renderer-contract.md)
 for what nine implementations settled about the shared contract, and what is still open on purpose.
 
-Each backend agrees with a Core Graphics reference on the same chart, checked on every test run —
-but agreement means less for the six that share CoreGraphics as their rasteriser than for the three
-that draw through their own pipeline entirely. See
+Eight of the nine agree with a Core Graphics reference on the same chart, checked on every test
+run — but agreement means less for the six that share CoreGraphics as their rasteriser than for the
+three that draw through their own pipeline entirely. SceneKit is the ninth and does not agree: a
+one-pixel line primitive cannot fill what a 1.5 pt stroke fills, so its test asserts the
+disagreement rather than widening a tolerance until it disappears. See
 [`Docs/methods/equivalence.md`](Docs/methods/equivalence.md).
 
 Every method also lives behind its own screen in the demo application, pushed and popped through
