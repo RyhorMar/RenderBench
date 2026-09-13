@@ -94,7 +94,9 @@ Stated because a list of gaps is worth more than ten more numbers:
   faster than another — only that it recorded lower numbers in one run.
 - **Equivalence.** The check is specified and not implemented. Every case currently records
   `notChecked`, which is a distinct value from `passed` precisely so it cannot be read as one.
-- **GPU time.** No GPU backend exists yet, so every `gpu` block is absent rather than zero.
+- **GPU time, for six of the nine.** `metal`, `metal-compute` and `core-image` report a `gpu`
+  block; the other six have nowhere to read one from, so theirs is absent rather than zero. A `cpu`
+  column standing alone is not a frame cost.
 
 ## Reading a file
 
