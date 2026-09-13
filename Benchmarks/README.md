@@ -92,8 +92,10 @@ Stated because a list of gaps is worth more than ten more numbers:
 - **Confidence intervals.** The procedure above specifies bootstrap intervals on p95; the code does
   not compute them yet. Until it does, no file in `results/` supports a claim that one backend is
   faster than another — only that it recorded lower numbers in one run.
-- **Equivalence.** The check is specified and not implemented. Every case currently records
-  `notChecked`, which is a distinct value from `passed` precisely so it cannot be read as one.
+- **Equivalence, during a run.** The comparison itself is implemented and every backend faces it
+  on each test run; the measurement runner does not call it, and writes `notChecked` for every
+  case — a distinct value from `passed` precisely so it cannot be read as one. Until the runner
+  computes it, no stored file shows that two backends drew the same picture.
 - **GPU time, for six of the nine.** `metal`, `metal-compute` and `core-image` report a `gpu`
   block; the other six have nowhere to read one from, so theirs is absent rather than zero. A `cpu`
   column standing alone is not a frame cost.
