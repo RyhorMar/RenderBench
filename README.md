@@ -1,7 +1,7 @@
 # RenderBench
 
-Nine ways to draw the same realtime chart on iOS, on the same data, with measured frame time
-and a documented failure point for each.
+Nine ways to draw the same realtime chart on iOS, on the same data, each reporting what it can
+observe about its own cost and saying so when it can observe nothing.
 
 **Status: nine backends of nine, measured once — one run, on one device.** Canvas, Core Animation and
 Metal draw through their own device APIs. Swift Charts and Shape + Path are SwiftUI's own retained
@@ -70,6 +70,12 @@ a data-age indicator. Every one of those is added once, across all nine backends
 than per backend — see [`Docs/adr/0002-renderer-contract.md`](Docs/adr/0002-renderer-contract.md).
 Oil & gas chart types and out-of-core data are not started. None of it started before the first
 measurement on a device, and that measurement is now in `Benchmarks/results/`.
+
+**Where each method breaks down is not established.** A failure point needs a load ladder — the
+same chart at rising point counts until the frame budget is missed — and the one run this
+repository holds has a single working point: eight series of 2,512 points. `Capability` is the type
+that would carry such a limit, with the device and the date it was measured at; it is declared for
+every backend and empty in all nine, which is the honest state rather than a number nobody took.
 
 ## Evidence
 
