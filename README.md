@@ -41,7 +41,8 @@ Accessibility and the oil & gas chart types are not written.
 
 ```
 swift test          # the package's own tests
-fastlane ci         # package, tests, layering rule, demo build
+fastlane ci         # the above, plus the layering rule, the method pages, the results
+                    # guard and its own seven cases, and the demo built and tested
 fastlane run_demo   # build, install and launch on a booted simulator
 ```
 
