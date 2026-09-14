@@ -113,6 +113,57 @@ if writeExample {
     }
 }
 
+/// An instance with **every** optional populated, used only to compare the schema against the
+/// model. Deliberately not the example: the example illustrates a plausible run, and a plausible
+/// run leaves optionals out.
+func everyFieldPopulated() -> BenchmarkResult {
+    let stats = FrameStatistics(sampleCount: 1, p50Ns: 1, p95Ns: 1, p99Ns: 1, maxNs: 1)
+    return BenchmarkResult(
+        run: RunMetadata(
+            id: "example",
+            startedAt: Date(timeIntervalSince1970: 0),
+            gitSha: String(repeating: "0", count: 40),
+            gitDirty: false,
+            seed: 1,
+            configuration: .release,
+            swiftVersion: "0",
+            xcodeVersion: "0"
+        ),
+        env: RunEnvironment(
+            deviceModel: "iPhone00,0",
+            osVersion: "0",
+            isSimulator: false,
+            maximumFramesPerSecond: 120,
+            thermalStateAtStart: .nominal,
+            thermalStateAtEnd: .nominal,
+            lowPowerModeEnabled: false,
+            batteryLevel: 1
+        ),
+        cases: [
+            BenchmarkCase(
+                chartKind: .stripChart,
+                backend: "example",
+                seriesCount: 1,
+                pointsPerSeries: 2,
+                refreshHz: 120,
+                achievedHz: 120,
+                policy: .minMax,
+                warmupFrames: 1,
+                measuredFrames: 1,
+                repeatIndex: 1,
+                cpu: stats,
+                raster: stats,
+                gpu: stats,
+                missedDeadlineRatio: 0,
+                pointsSubmitted: 2,
+                pointsDrawn: 2,
+                drawCalls: 1,
+                equivalence: .passed
+            )
+        ]
+    )
+}
+
 // MARK: 1. The schema still requires what must be required
 
 do {
@@ -156,6 +207,66 @@ do {
     }
 } catch {
     problems.append("Benchmarks/schema.json: \(error)")
+}
+
+// MARK: 1b. The schema and the model agree field by field
+
+// `additionalProperties: false` means a field the model encodes and the schema does not declare
+// makes every file this project writes invalid for any external validator — including ours, once
+// one is wired in. The inverse is quieter and just as wrong: a field the schema declares and no
+// encoder emits documents a column that never arrives. Neither is visible from reading one file,
+// because the fields at stake are the optional ones and a given run may carry none of them.
+//
+// Compared against an instance with every optional populated, not against a stored result: a
+// result is allowed to omit optionals, so it can never show that the schema declares too few.
+do {
+    let data = try Data(contentsOf: schemaURL)
+    guard let schema = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+        throw BenchmarkValidationError.missingField("schema root object")
+    }
+    let defs = schema["$defs"] as? [String: Any] ?? [:]
+
+    /// Follows `$ref` into `$defs`. Only local refs exist here; a remote one is a defect worth
+    /// naming rather than silently skipping.
+    func resolve(_ node: [String: Any]) -> [String: Any] {
+        guard let ref = node["$ref"] as? String else { return node }
+        let name = ref.replacingOccurrences(of: "#/$defs/", with: "")
+        guard ref.hasPrefix("#/$defs/"), let target = defs[name] as? [String: Any] else {
+            problems.append("Benchmarks/schema.json: cannot resolve \(ref)")
+            return [:]
+        }
+        return target
+    }
+
+    func compare(_ encoded: Any, against node: [String: Any], at path: String) {
+        let node = resolve(node)
+        if let object = encoded as? [String: Any] {
+            let declared = node["properties"] as? [String: Any] ?? [:]
+            for key in object.keys.sorted() where declared[key] == nil {
+                problems.append(
+                    "Benchmarks/schema.json: \(path).\(key) is encoded by the model and not declared; additionalProperties is false, so our own files would be rejected"
+                )
+            }
+            for key in declared.keys.sorted() where object[key] == nil {
+                problems.append(
+                    "Benchmarks/schema.json: \(path).\(key) is declared and no encoder emits it"
+                )
+            }
+            for key in object.keys.sorted() {
+                guard let child = declared[key] as? [String: Any] else { continue }
+                compare(object[key]!, against: child, at: "\(path).\(key)")
+            }
+        } else if let array = encoded as? [Any], let first = array.first {
+            compare(first, against: node["items"] as? [String: Any] ?? [:], at: "\(path)[]")
+        }
+    }
+
+    let encoded = try JSONSerialization.jsonObject(
+        with: try BenchmarkResult.encoder().encode(everyFieldPopulated())
+    )
+    compare(encoded, against: schema, at: "root")
+} catch {
+    problems.append("Benchmarks/schema.json: field-by-field comparison failed: \(error)")
 }
 
 // MARK: 2. The example
