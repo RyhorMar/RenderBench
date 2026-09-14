@@ -23,6 +23,14 @@ For _fastlane_ installation instructions, see [Installing _fastlane_](https://do
 
 Stamp the build with the revision it came from
 
+### ios hygiene
+
+```sh
+[bundle exec] fastlane ios hygiene
+```
+
+Check that no tracked file names a developer's machine, a document this repository does not carry, or a key from a tracker it does not use
+
 ### ios bench_guard
 
 ```sh

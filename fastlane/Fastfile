@@ -68,6 +68,46 @@ platform :ios do
     UI.message("stamped #{sha[0, 12]}#{dirty ? ' (dirty)' : ''}")
   end
 
+  desc "Check that no tracked file names a developer's machine, a document this repository does " \
+       "not carry, or a key from a tracker it does not use"
+  lane :hygiene do
+    root = File.expand_path("..", Dir.pwd)
+
+    # Each pattern is written so that this file does not match it: `[U]sers` is the same regular
+    # expression as `Users` and is not the same string, so the rule below can name the thing it
+    # forbids without becoming the first offence the lane reports.
+    rules = [
+      [%r{/[U]sers/}, "an absolute path on a developer's machine"],
+      [%r{\b[s]pecs/}, "a path to a document this repository does not carry"],
+      [/\b[NMFGABCDE]-[0-9]+[a-z]?\b/, "a key from an issue tracker this repository does not use"],
+    ]
+
+    offences = sh("git", "-C", root, "ls-files", "-z", log: false).split("\0").flat_map do |name|
+      path = File.join(root, name)
+      next [] unless File.file?(path)
+      body = File.binread(path)
+      # A font and a reference PNG both match almost any pattern once their bytes are read as
+      # text. `grep -I` skips them for that reason, and a check that fails on every commit is one
+      # everybody learns to skip.
+      next [] if body.include?("\0")
+      body.force_encoding(Encoding::UTF_8)
+      next [] unless body.valid_encoding?
+
+      body.each_line.with_index(1).flat_map do |line, number|
+        rules.filter_map { |pattern, what| "#{name}:#{number}: #{what}" if line.match?(pattern) }
+      end
+    end
+
+    # History as well as the tree: a path can leave the files and stay in the message that
+    # explained why it was there.
+    messages = sh("git", "-C", root, "log", "--format=%b", log: false)
+    offences << "a commit message names a document this repository does not carry" if
+      messages.match?(%r{\b[s]pecs/})
+
+    UI.user_error!("repository hygiene:\n#{offences.join("\n")}") unless offences.empty?
+    UI.message("hygiene: #{offences.size} offences in the tracked tree and the commit messages")
+  end
+
   desc "Validate the benchmark schema, the example and every stored result"
   lane :bench_guard do
     sh("swift", "run", "--package-path", "..", "CheckBenchmarkResults", File.expand_path("..", Dir.pwd))
@@ -344,6 +384,9 @@ platform :ios do
 
   desc "Everything CI runs"
   lane :ci do
+    # First, and deliberately: it costs a second, and a leak found after a demo build is a leak
+    # found four minutes late.
+    hygiene
     package
     imports
     method_docs
