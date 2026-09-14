@@ -290,7 +290,14 @@ platform :ios do
     app = "Demo/.build-demo/Build/Products/Debug-iphonesimulator/#{DEMO_SCHEME}.app"
     Dir.chdir("..") do
       sh("xcrun", "simctl", "install", "booted", app)
-      sh("xcrun", "simctl", "launch", "booted", "dev.renderbench.demo")
+      # Read out of the bundle that was just installed, never written down here. A literal drifted
+      # from the project once already and the lane went on reporting success, because a stale build
+      # under the old identifier was still installed on this machine — so it launched that instead.
+      bundle_id = sh(
+        "/usr/libexec/PlistBuddy", "-c", "Print :CFBundleIdentifier", "#{app}/Info.plist", log: false
+      ).strip
+      UI.user_error!("the built app declares no bundle identifier") if bundle_id.empty?
+      sh("xcrun", "simctl", "launch", "booted", bundle_id)
     end
   end
 
