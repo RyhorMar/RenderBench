@@ -10,6 +10,9 @@ ENV["LC_ALL"] = "en_US.UTF-8" if ENV["LC_ALL"].to_s.empty?
 # Lanes are the single definition of "does this build". CI calls the same ones a developer does,
 # so a green pipeline and a green machine cannot mean different things.
 
+require "json"
+require "shellwords"
+
 default_platform(:ios)
 
 DEMO_PROJECT = "Demo/RenderBenchDemo.xcodeproj"
@@ -118,12 +121,26 @@ platform :ios do
       &.fetch("name")
     UI.user_error!("no iPhone simulator available") unless device_name
 
-    xcodebuild(
-      project: DEMO_PROJECT,
-      scheme: DEMO_SCHEME,
-      destination: "platform=iOS Simulator,name=#{device_name}",
-      test: true
-    )
+    # A result bundle, and a summary read back out of it. `xcpretty` does not understand
+    # swift-testing's output: the 83 tests of RenderBenchDemoTests run and pass, and not one line
+    # of them reaches the lane's log — a failure there would show only as a non-zero exit status,
+    # with no test named. The bundle also lands under the shared derived data path, which is where
+    # the workflow's export step already looks for it.
+    bundle = File.expand_path("../Demo/.build-demo/demo-tests.xcresult", Dir.pwd)
+    FileUtils.rm_rf(bundle)
+
+    begin
+      xcodebuild(
+        project: DEMO_PROJECT,
+        scheme: DEMO_SCHEME,
+        destination: "platform=iOS Simulator,name=#{device_name}",
+        derivedDataPath: "Demo/.build-demo",
+        test: true,
+        xcargs: "-resultBundlePath #{bundle.shellescape}"
+      )
+    ensure
+      report_test_results(bundle)
+    end
   end
 
   desc "Build the demo, install it on a booted simulator and launch it"
@@ -136,6 +153,36 @@ platform :ios do
       sh("xcrun", "simctl", "install", "booted", app)
       sh("xcrun", "simctl", "launch", "booted", "dev.renderbench.demo")
     end
+  end
+
+
+  # Reads the run back out of the result bundle and says what actually happened.
+  #
+  # Required because a formatter that silently drops a whole test library is worse than no
+  # formatter: the lane stays green-looking while the tests it claims to run are invisible. Zero
+  # tests is treated as a failure for the same reason the mutation harness treats it that way — a
+  # check that cannot have failed did not pass.
+  def report_test_results(bundle)
+    unless File.exist?(bundle)
+      UI.user_error!("no result bundle at #{bundle}: the test action did not get far enough to write one")
+    end
+
+    summary = JSON.parse(
+      sh("xcrun", "xcresulttool", "get", "test-results", "summary", "--path", bundle, "--compact",
+         log: false)
+    )
+    total = summary["totalTestCount"].to_i
+    failed = summary["failedTests"].to_i
+
+    UI.message(
+      "demo tests: #{total} run, #{summary["passedTests"]} passed, #{failed} failed, " \
+      "#{summary["skippedTests"]} skipped"
+    )
+    Array(summary["testFailures"]).each do |failure|
+      UI.error("  FAILED #{failure["testName"]} — #{failure["failureText"]}")
+    end
+
+    UI.user_error!("the test action reported 0 tests; a run that cannot fail did not pass") if total.zero?
   end
 
   desc "Everything CI runs"
