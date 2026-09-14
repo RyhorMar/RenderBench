@@ -136,6 +136,29 @@ schemes:
     archive:
       config: Release
 
+  # The device sweep, and nothing else.
+  #
+  # It needs its own scheme because `skippedTests` in the scheme above outranks `-only-testing:` on
+  # the command line: asking for DeviceSweepTests by name printed `** TEST SUCCEEDED **` having run
+  # zero tests, and the same mechanism would have hidden a genuinely broken sweep.
+  #
+  # Release, unlike the scheme above, whose test action is Debug. A sweep reads frame rates off a
+  # real device, and an unoptimised build is not the one anyone ships — the readings taken through
+  # the other scheme describe `-Onone` and must be labelled that way wherever they are quoted.
+  RenderBenchDemoSweep:
+    build:
+      targets:
+        RenderBenchDemo: all
+        RenderBenchDemoUITests: [test]
+    test:
+      config: Release
+      targets:
+        - name: RenderBenchDemoUITests
+          selectedTests:
+            - DeviceSweepTests
+    run:
+      config: Release
+
   # The scheme a measurement is taken with, and the only one whose binary is the one that would
   # ship. The scheme above builds the unit test target alongside the app, and that target uses
   # `@testable import`, which in Release needs `ENABLE_TESTABILITY=YES` on the whole build — so a
