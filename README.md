@@ -46,6 +46,13 @@ fastlane ci         # the above, plus the layering rule, the method pages, the r
 fastlane run_demo   # build, install and launch on a booted simulator
 ```
 
+The package needs **Swift 6.2 or newer** — the manifest declares that tools version, and every
+target builds in Swift 6 language mode. It deploys to iOS 18 and macOS 15; the floor is iOS 18
+because the frame slot is built on `Mutex`, and [`Docs/adr/0001-platform-minimum.md`](Docs/adr/0001-platform-minimum.md)
+says why that is not negotiable. The two `fastlane` commands additionally need **Xcode 26** — the
+demo application targets iOS 26 — plus XcodeGen 2.42 or newer and fastlane itself. Everything above
+was last run on Xcode 26.6 with Swift 6.3.3.
+
 ## How the methods work, and where they came from
 
 [`Docs/methods/`](Docs/methods/) documents every algorithm in the package on one page per family:
