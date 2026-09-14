@@ -80,11 +80,15 @@ every backend and empty in all nine, which is the honest state rather than a num
 
 ## Evidence
 
-Every performance claim in this repository names the device, the OS version, the build
-configuration and the git SHA it came from, and the raw run is checked in under
-`Benchmarks/results/`. Simulator timings are never published: Metal is translated there, the
-thermal envelope does not exist and ProMotion is unavailable. A number without a run behind it
-is labelled a hypothesis, here and on the method pages alike.
+A number published as a measurement lives in `Benchmarks/results/`, and names the device, the OS
+version, the build configuration and the git SHA it came from. That is enforced rather than
+observed: bench-guard refuses a file whose SHA is missing, and refuses one taken on a simulator —
+Metal is translated there, the thermal envelope does not exist and ProMotion is unavailable.
+
+A handful of numbers appear in comments where the code depends on a system API behaving a
+particular way — a display link's actual rate, say. Those name the device they were seen on and
+claim nothing beyond it; they are observations, not measurements, and none of them is quoted as a
+result.
 
 ## Licence
 
