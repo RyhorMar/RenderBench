@@ -14,7 +14,7 @@ import Foundation
 ///
 /// - SeeAlso: Docs/methods/scenekit.md
 public enum SceneKitBackend {
-    /// Stable identifier used in benchmark metadata and in the comparison matrix.
+    /// Stable identifier used in benchmark metadata and in the results files.
     public static let identifier = "scenekit"
 
     /// What this backend can do, as measured numbers.

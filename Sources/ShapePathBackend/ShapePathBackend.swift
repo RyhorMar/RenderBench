@@ -9,7 +9,7 @@ import Foundation
 /// when to turn it into pixels, on its own render server, the same shape of problem
 /// `CoreAnimationRenderer` and `SwiftChartsRenderer` both have.
 public enum ShapePathBackend {
-    /// Stable identifier used in benchmark metadata and in the comparison matrix.
+    /// Stable identifier used in benchmark metadata and in the results files.
     public static let identifier = "shape-path"
 
     /// What this backend can do, as measured numbers.

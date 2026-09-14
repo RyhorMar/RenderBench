@@ -13,7 +13,7 @@ import Foundation
 /// invariant of this project, and a backend running its own clock would be drawing different work
 /// from the one it is compared against. The clock stays shared; only the geometry differs.
 public enum CoreAnimationBackend {
-    /// Stable identifier used in benchmark metadata and in the comparison matrix.
+    /// Stable identifier used in benchmark metadata and in the results files.
     public static let identifier = "core-animation"
 
     /// What this backend can do, as measured numbers.

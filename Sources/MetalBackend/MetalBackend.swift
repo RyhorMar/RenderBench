@@ -13,7 +13,7 @@ import Foundation
 /// question about fill rate rather than about path construction. If that does not happen, the
 /// interesting result is why.
 public enum MetalBackend {
-    /// Stable identifier used in benchmark metadata and in the comparison matrix.
+    /// Stable identifier used in benchmark metadata and in the results files.
     public static let identifier = "metal"
 
     /// What this backend can do, as measured numbers.

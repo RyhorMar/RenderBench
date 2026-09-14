@@ -12,7 +12,7 @@ import Foundation
 ///
 /// - SeeAlso: Docs/methods/core-image.md
 public enum CoreImageBackend {
-    /// Stable identifier used in benchmark metadata and in the comparison matrix.
+    /// Stable identifier used in benchmark metadata and in the results files.
     public static let identifier = "core-image"
 
     /// What this backend can do, as measured numbers.

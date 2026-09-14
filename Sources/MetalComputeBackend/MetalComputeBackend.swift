@@ -10,7 +10,7 @@ import Foundation
 /// the result back, and only then draws with the same instanced-quad line pass `MetalBackend`
 /// uses. The hypothesis under test: does moving MinMax reduction onto the GPU change the picture.
 public enum MetalComputeBackend {
-    /// Stable identifier used in benchmark metadata and in the comparison matrix.
+    /// Stable identifier used in benchmark metadata and in the results files.
     public static let identifier = "metal-compute"
 
     /// What this backend can do, as measured numbers.

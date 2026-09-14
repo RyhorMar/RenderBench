@@ -10,7 +10,7 @@ import Foundation
 /// The drawing implementation lands with the host application — a backend with nowhere to draw
 /// cannot be verified, and an unverified renderer is not worth committing.
 public enum CanvasBackend {
-    /// Stable identifier used in benchmark metadata and in the comparison matrix.
+    /// Stable identifier used in benchmark metadata and in the results files.
     public static let identifier = "canvas"
 
     /// What this backend can do, as measured numbers.

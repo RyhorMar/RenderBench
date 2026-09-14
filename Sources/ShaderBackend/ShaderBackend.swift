@@ -13,7 +13,7 @@ import Foundation
 /// data, so the line the reader sees was decided by a program running once per output pixel rather
 /// than by anything this backend built in advance.
 public enum ShaderBackend {
-    /// Stable identifier used in benchmark metadata and in the comparison matrix.
+    /// Stable identifier used in benchmark metadata and in the results files.
     public static let identifier = "shader"
 
     /// What this backend can do, as measured numbers.

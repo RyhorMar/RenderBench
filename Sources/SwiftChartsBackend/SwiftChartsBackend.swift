@@ -8,7 +8,7 @@ import Foundation
 /// own axes and grid are hidden — see `SwiftChartsChartView` — so that machinery never decides
 /// where the plot sits; it only ever places marks inside a rectangle this package already chose.
 public enum SwiftChartsBackend {
-    /// Stable identifier used in benchmark metadata and in the comparison matrix.
+    /// Stable identifier used in benchmark metadata and in the results files.
     public static let identifier = "swift-charts"
 
     /// What this backend can do, as measured numbers.
