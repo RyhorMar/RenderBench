@@ -12,6 +12,7 @@ ENV["LC_ALL"] = "en_US.UTF-8" if ENV["LC_ALL"].to_s.empty?
 
 require "json"
 require "shellwords"
+require "timeout"
 require "tmpdir"
 require "fileutils"
 
@@ -19,6 +20,10 @@ default_platform(:ios)
 
 DEMO_PROJECT = "Demo/RenderBenchDemo.xcodeproj"
 DEMO_SCHEME = "RenderBenchDemo"
+# Measured on this machine, 14 September 2026: the whole test action — build, 87 unit tests and 4
+# UI tests — takes about 190 s. Five times that is still far below the three hours a starved run
+# has actually stood for.
+DEMO_TEST_CAP_SECONDS = Integer(ENV.fetch("RENDERBENCH_DEMO_TEST_CAP", "900"))
 
 platform :ios do
   desc "Stamp the build with the revision it came from"
@@ -201,17 +206,79 @@ platform :ios do
     bundle = File.expand_path("../Demo/.build-demo/demo-tests.xcresult", Dir.pwd)
     FileUtils.rm_rf(bundle)
 
+    # Run xcodebuild ourselves so the cap below can actually reach it. Ruby's Timeout raises into
+    # the main thread, and the main thread inside fastlane's own xcodebuild action does not come
+    # back until the child does: with a 25 s cap a 145 s run was "stopped" after 145 s. A cap that
+    # fires only once the thing it was capping has finished is not a cap, and measured on 14
+    # September 2026 that is exactly what it did. The watchdog kills the process group by pid.
+    elapsed = nil
+    log = File.expand_path("../Demo/.build-demo/demo-tests.log", Dir.pwd)
+    FileUtils.mkdir_p(File.dirname(log))
+
+    started = Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    timed_out = false
     begin
-      xcodebuild(
-        project: DEMO_PROJECT,
-        scheme: DEMO_SCHEME,
-        destination: "platform=iOS Simulator,name=#{device_name}",
-        derivedDataPath: "Demo/.build-demo",
-        test: true,
-        xcargs: "-resultBundlePath #{bundle.shellescape}"
+      pid = Process.spawn(
+        "xcodebuild",
+        "-project", File.expand_path("../#{DEMO_PROJECT}", Dir.pwd),
+        "-scheme", DEMO_SCHEME,
+        "-destination", "platform=iOS Simulator,name=#{device_name}",
+        "-derivedDataPath", File.expand_path("../Demo/.build-demo", Dir.pwd),
+        "-resultBundlePath", bundle,
+        "test",
+        out: log, err: [:child, :out], pgroup: true
       )
+      group = Process.getpgid(pid)
+
+      watchdog = Thread.new do
+        # A deadline, not a sleep: a spurious wake-up must not shorten the cap.
+        deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + DEMO_TEST_CAP_SECONDS
+        while Process.clock_gettime(Process::CLOCK_MONOTONIC) < deadline
+          sleep 2
+          break unless begin
+            Process.kill(0, pid)
+            true
+          rescue Errno::ESRCH
+            false
+          end
+        end
+        begin
+          timed_out = true
+          Process.kill("TERM", -group)
+          sleep 5
+          Process.kill("KILL", -group)
+        rescue Errno::ESRCH
+          nil
+        end
+      end
+
+      _, status = Process.waitpid2(pid)
+      watchdog.kill
+      elapsed = Process.clock_gettime(Process::CLOCK_MONOTONIC) - started
+
+      if timed_out
+        UI.user_error!(
+          format(
+            "the demo test action was killed after %.0f s, past the %d s cap. This says nothing " \
+            "about the code: check host load and whether an earlier run left a simulator behind, " \
+            "then run the lane again. Output: %s",
+            elapsed, DEMO_TEST_CAP_SECONDS, log
+          )
+        )
+      end
+      unless status.success?
+        # Raised here and not left to the summary: a build that never reached the tests writes no
+        # failures into the bundle, and a lane that only reports what the bundle holds would call
+        # that green. Running xcodebuild directly means nothing else turns a non-zero status into
+        # a red lane — verified by breaking one test on purpose and watching this lane pass.
+        UI.error(File.readlines(log).last(40).join) if File.exist?(log)
+        report_test_results(bundle) if File.exist?(bundle)
+        UI.user_error!("the demo test action exited #{status.exitstatus}; see #{log}")
+      end
     ensure
-      report_test_results(bundle)
+      elapsed ||= Process.clock_gettime(Process::CLOCK_MONOTONIC) - started
+      UI.message(format("demo test action: %.0f s of a %d s cap", elapsed, DEMO_TEST_CAP_SECONDS))
+      report_test_results(bundle) if File.exist?(bundle) && !timed_out
     end
   end
 
@@ -255,6 +322,7 @@ platform :ios do
     end
 
     UI.user_error!("the test action reported 0 tests; a run that cannot fail did not pass") if total.zero?
+    UI.user_error!("#{failed} demo test#{failed == 1 ? "" : "s"} failed") if failed.positive?
   end
 
   desc "Everything CI runs"
