@@ -40,8 +40,9 @@ Every page follows the same eight sections, in this order:
 ## Two rules
 
 **Provenance is never omitted.** Where no authoritative source exists, section 5 says so and lists
-what was consulted and why it does not qualify. Four of these methods rest on conventions with no
-citable origin, and each says as much on its own page. A method presented without provenance reads
+what was consulted and why it does not qualify. The "Authoritative source exists" column above is
+the only place that count lives: written out in prose as well, the two drifted apart — the README
+said three while this page said four, and the table agreed with neither reading. A method presented without provenance reads
 as one whose provenance nobody checked.
 
 **No reference is written down before it is fetched.** Every URL in these pages was retrieved and

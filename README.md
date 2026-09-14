@@ -49,9 +49,10 @@ fastlane run_demo   # build, install and launch on a booted simulator
 
 [`Docs/methods/`](Docs/methods/) documents every algorithm in the package on one page per family:
 what it does, its contract, why it was chosen over the alternative, the literature it comes from
-with a section number, how this implementation differs from that source, and where it lies. Three
-of the methods have no citable origin and say so on their own pages rather than borrowing a
-reference that does not cover them.
+with a section number, how this implementation differs from that source, and where it lies. Where
+a method has no citable origin its page says so, and lists what was consulted and why it does not
+qualify, rather than borrowing a reference that does not cover it. Which pages those are is a
+column in the index, not a number repeated in prose.
 
 Every reference was fetched before it was written down. `fastlane method_docs` fails when a page
 names a symbol the code no longer declares.
