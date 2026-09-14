@@ -12,6 +12,8 @@ ENV["LC_ALL"] = "en_US.UTF-8" if ENV["LC_ALL"].to_s.empty?
 
 require "json"
 require "shellwords"
+require "tmpdir"
+require "fileutils"
 
 default_platform(:ios)
 
@@ -54,6 +56,7 @@ platform :ios do
   desc "Validate the benchmark schema, the example and every stored result"
   lane :bench_guard do
     sh("swift", "run", "--package-path", "..", "CheckBenchmarkResults", File.expand_path("..", Dir.pwd))
+    guard_rejects_what_it_must
 
     # A stamped BuildInfo.swift in the repository would attribute every later build to one old
     # revision, and every result taken from those builds to the wrong commit. Cheap to check, and
@@ -65,6 +68,75 @@ platform :ios do
         "hold placeholders; `fastlane stamp` fills it in locally."
       )
     end
+  end
+
+
+  # The gate that guards the gate.
+  #
+  # bench-guard decides what counts as evidence in this repository, and until now it was checked by
+  # hand — which means it was checked once, on a tree where it happened to pass. Each case below
+  # copies Benchmarks/ to a scratch root, breaks exactly one thing a reader would be misled by, and
+  # requires a refusal. The first case breaks nothing: a harness that cannot pass proves nothing
+  # about the failures it reports.
+  def guard_rejects_what_it_must
+    root = File.expand_path("..", Dir.pwd)
+    stored = Dir[File.join(root, "Benchmarks/results/*.json")].reject { |f| f.end_with?(".gitkeep") }
+    UI.user_error!("no stored result to build fixtures from") if stored.empty?
+
+    cases = {
+      "an untouched copy" => [true, ->(_b) {}],
+      "a run measured on a simulator" => [false, ->(b) { edit_result(b) { |r| r["env"]["isSimulator"] = true } }],
+      "a build that skipped the stamp" => [false, ->(b) { edit_result(b) { |r| r["run"]["gitSha"] = "unknown" } }],
+      "a case whose equivalence failed" => [false, ->(b) { edit_result(b) { |r| r["cases"][0]["equivalence"] = "failed" } }],
+      "a schema that stopped requiring gitSha" => [false, ->(b) {
+        edit_json(File.join(b, "schema.json")) { |s| s["properties"]["run"]["required"].delete("gitSha") }
+      }],
+      "an example that could pass for a measurement" => [false, ->(b) {
+        edit_json(File.join(b, "example.json")) { |e| e["run"]["id"] = "run-0001" }
+      }]
+    }
+
+    cases.each do |name, (must_pass, break_it)|
+      Dir.mktmpdir do |scratch|
+        FileUtils.cp_r(File.join(root, "Benchmarks"), scratch)
+        break_it.call(File.join(scratch, "Benchmarks"))
+        passed = system(
+          "swift", "run", "--package-path", "..", "CheckBenchmarkResults", scratch,
+          out: File::NULL, err: File::NULL
+        )
+        if passed == must_pass
+          UI.message("bench-guard #{must_pass ? "accepts" : "rejects"}: #{name}")
+        else
+          UI.user_error!(
+            "bench-guard #{passed ? "accepted" : "rejected"} #{name}; it must have " \
+            "#{must_pass ? "accepted" : "rejected"} it. The guard is not measuring what it claims."
+          )
+        end
+      end
+    end
+
+    # `--write-example` regenerates the file a reader copies from. Nothing checked that what it
+    # writes still passes the guard that reads it, which is the one property it must have.
+    Dir.mktmpdir do |scratch|
+      FileUtils.cp_r(File.join(root, "Benchmarks"), scratch)
+      File.delete(File.join(scratch, "Benchmarks/example.json"))
+      sh("swift", "run", "--package-path", "..", "CheckBenchmarkResults", scratch, "--write-example")
+      UI.user_error!("--write-example wrote no example") unless File.exist?(File.join(scratch, "Benchmarks/example.json"))
+      sh("swift", "run", "--package-path", "..", "CheckBenchmarkResults", scratch)
+      UI.message("bench-guard accepts: the example its own --write-example regenerates")
+    end
+  end
+
+  # Applies a change to the one stored result in a scratch Benchmarks/ directory.
+  def edit_result(benchmarks, &block)
+    file = Dir[File.join(benchmarks, "results/*.json")].reject { |f| f.end_with?(".gitkeep") }.first
+    edit_json(file, &block)
+  end
+
+  def edit_json(path)
+    parsed = JSON.parse(File.read(path))
+    yield parsed
+    File.write(path, JSON.pretty_generate(parsed))
   end
 
   desc "Regenerate the demo project from Demo/project.yml"
