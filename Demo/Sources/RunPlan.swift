@@ -31,6 +31,27 @@ struct RunPlan: Codable, Equatable {
     var repeatIndex: Int
     /// Everything finished so far, across every repeat.
     var cases: [BenchmarkCase]
+    /// Why the run stopped, when it stopped for a reason rather than between cases.
+    ///
+    /// In the plan and not only on screen, because from outside the process a run held by a
+    /// violated precondition and a run that has hung look identical: the file stops changing and
+    /// nothing says which. Twice on 14 September 2026 that cost an hour of guessing at a phone
+    /// nobody was standing next to. Cleared the moment a launch gets past the preconditions.
+    var halt: Halt?
+
+    /// A reason a run is not proceeding, and when it stopped being able to.
+    struct Halt: Codable, Equatable {
+        /// `blocked` — a precondition is violated and the run will continue when it is not.
+        /// `abandoned` — the case in progress is void and its repeat will be measured again.
+        enum Kind: String, Codable, Equatable {
+            case blocked
+            case abandoned
+        }
+        let kind: Kind
+        /// What is wrong, in the words the screen uses, so the file and the screen cannot disagree.
+        let reason: String
+        let at: Date
+    }
 
     /// Frames drawn and thrown away before each case is measured.
     ///
@@ -67,7 +88,8 @@ struct RunPlan: Codable, Equatable {
             measuredFrames: measuredFrames,
             cooldownSeconds: cooldownSeconds,
             repeatIndex: 1,
-            cases: []
+            cases: [],
+            halt: nil
         )
     }
 

@@ -103,9 +103,11 @@ final class BenchmarkRunner {
         let current = conditions()
         let blockers = RunButton.blockers(in: RunPreconditions.list(for: current)).map(\.title)
         guard blockers.isEmpty else {
+            record(.init(kind: .blocked, reason: blockers.joined(separator: ", "), at: now()), on: saved)
             phase = .blocked(blockers)
             return
         }
+        saved.halt = nil
         // A repeat that was interrupted **part-way** is dropped rather than stitched onto this
         // one: its cases were measured in a process that is gone, and the point of restarting
         // between repeats is that a repeat is one process.
@@ -161,6 +163,7 @@ final class BenchmarkRunner {
         switch phase {
         case .warmup, .measuring, .cooling:
             scene.stop()
+            if let plan { record(.init(kind: .abandoned, reason: reason, at: now()), on: plan) }
             phase = .abandoned(reason: reason)
         default:
             break
@@ -196,6 +199,16 @@ final class BenchmarkRunner {
         phase = .cooling(secondsLeft: current.cooldownSeconds)
     }
 
+    /// Writes the reason a run is not proceeding into the plan, where a reader outside the
+    /// process can find it. The screen shows the same words; the file is what survives the screen
+    /// being somewhere else.
+    private func record(_ halt: RunPlan.Halt, on plan: RunPlan) {
+        var stopped = plan
+        stopped.halt = halt
+        self.plan = stopped
+        storage.save(stopped)
+    }
+
     private func beginNextCase() {
         guard var current = plan else { return }
         if let next = current.remaining.first {
@@ -213,6 +226,7 @@ final class BenchmarkRunner {
         let ending = conditions()
         let blockers = RunButton.blockers(in: RunPreconditions.list(for: ending)).map(\.title)
         guard blockers.isEmpty else {
+            record(.init(kind: .blocked, reason: blockers.joined(separator: ", "), at: now()), on: current)
             phase = .blocked(blockers)
             return
         }

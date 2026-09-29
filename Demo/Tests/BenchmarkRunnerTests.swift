@@ -75,6 +75,54 @@ private func drive(_ runner: BenchmarkRunner, _ ticker: ManualTicker, limit: Int
 }
 
 /// The whole sweep: every backend, three repeats, one file.
+
+@MainActor
+@Test
+func aRunHeldByAPreconditionSaysSoInTheFileAndNotOnlyOnTheScreen() {
+    let ticker = ManualTicker()
+    let storage = MemoryRunStorage()
+    let machine = Box(goodMachine)
+    let runner = BenchmarkRunner(scene: makeScene(ticker), storage: storage,
+                                 conditions: { machine.value }, now: { Date(timeIntervalSince1970: 100) })
+    runner.start(backends: ["canvas", "metal"], repeats: 2, seed: 7)
+    #expect(storage.plan?.halt == nil, "a run that started is not halted")
+
+    machine.value.thermalState = .serious
+    let second = BenchmarkRunner(scene: makeScene(ticker), storage: storage,
+                                 conditions: { machine.value }, now: { Date(timeIntervalSince1970: 200) })
+    second.resume()
+
+    let halt = storage.plan?.halt
+    #expect(halt?.kind == .blocked)
+    #expect(halt?.reason.contains("Thermal") == true, "read \(String(describing: halt?.reason))")
+    #expect(halt?.at == Date(timeIntervalSince1970: 200))
+
+    // And it clears, rather than staying behind to describe a run that has moved on.
+    machine.value = goodMachine
+    let third = BenchmarkRunner(scene: makeScene(ticker), storage: storage,
+                                conditions: { machine.value }, now: { Date(timeIntervalSince1970: 300) })
+    third.resume()
+    #expect(storage.plan?.halt == nil, "the halt outlived the condition that caused it")
+}
+
+@MainActor
+@Test
+func aRunAbandonedMidCaseSaysWhyInTheFile() {
+    let ticker = ManualTicker()
+    let storage = MemoryRunStorage()
+    let runner = BenchmarkRunner(scene: makeScene(ticker), storage: storage,
+                                 conditions: { goodMachine }, now: { Date(timeIntervalSince1970: 500) })
+    runner.start(backends: ["canvas"], repeats: 1, seed: 7)
+    ticker.fire(at: 1.0 / 120)
+
+    runner.interrupted(reason: "the app left the foreground")
+
+    let halt = storage.plan?.halt
+    #expect(halt?.kind == .abandoned)
+    #expect(halt?.reason == "the app left the foreground")
+    #expect(halt?.at == Date(timeIntervalSince1970: 500))
+}
+
 @MainActor
 @Test
 func aRepeatWhoseLastCaseLandedSurvivesARelaunchDuringTheCooldown() {
