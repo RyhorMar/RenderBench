@@ -77,6 +77,61 @@ private func drive(_ runner: BenchmarkRunner, _ ticker: ManualTicker, limit: Int
 /// The whole sweep: every backend, three repeats, one file.
 @MainActor
 @Test
+func aRepeatWhoseLastCaseLandedSurvivesARelaunchDuringTheCooldown() {
+    let ticker = ManualTicker()
+    let scene = makeScene(ticker)
+    let storage = MemoryRunStorage()
+    let runner = BenchmarkRunner(scene: scene, storage: storage, conditions: { goodMachine })
+    // Without this the runner never sees a frame, the phase never leaves warm-up, and the loop
+    // below spins until the test host kills it — which reads as a failure and proves nothing.
+    scene.onFrame = { [weak runner] in runner?.frameDrawn(at: scene.lastFrameTimestamp) }
+    let backends = ["canvas", "metal"]
+
+    runner.start(backends: backends, repeats: 2, seed: 7)
+    // Every case of repeat one, and then nothing: the cool-down after the last one is left
+    // unticked, which is the state the file is in while an operator reads it and relaunches.
+    var time = 0.0
+    var finished = 0
+    var steps = 0
+    while finished < backends.count {
+        steps += 1
+        guard steps < 20_000 else {
+            Issue.record("the run did not reach the end of repeat one; stuck in \(runner.phase)")
+            return
+        }
+        switch runner.phase {
+        case .warmup, .measuring:
+            time += 1.0 / 120
+            ticker.fire(at: time)
+        case .cooling:
+            finished = storage.plan?.cases.count ?? 0
+            if finished < backends.count { runner.secondElapsed() }
+        default:
+            Issue.record("unexpected phase \(runner.phase)")
+            return
+        }
+    }
+    #expect(storage.plan?.repeatIndex == 1, "the index advances only after the cool-down")
+    #expect(storage.plan?.cases.count == backends.count)
+
+    // The relaunch an operator makes on seeing the last case appear.
+    let freshScene = makeScene(ticker)
+    let second = BenchmarkRunner(scene: freshScene, storage: storage, conditions: { goodMachine })
+    freshScene.onFrame = { [weak second] in second?.frameDrawn(at: freshScene.lastFrameTimestamp) }
+    second.resume()
+
+    #expect(storage.plan?.cases.count == backends.count, "a finished repeat was discarded")
+    #expect(storage.plan?.repeatIndex == 2, "the finished repeat did not advance")
+    if case .awaitingRelaunch(let done, let total) = second.phase {
+        #expect(done == 1)
+        #expect(total == 2)
+    } else {
+        Issue.record("expected awaitingRelaunch, got \(second.phase)")
+    }
+}
+
+@MainActor
+@Test
 func aRunProducesOneFileWithEveryBackendInEveryRepeat() {
     let ticker = ManualTicker()
     let scene = makeScene(ticker)

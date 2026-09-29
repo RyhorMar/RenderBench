@@ -106,10 +106,18 @@ final class BenchmarkRunner {
             phase = .blocked(blockers)
             return
         }
-        // A repeat that was interrupted part-way is dropped rather than stitched onto this one:
-        // its cases were measured in a process that is gone, and the point of restarting between
-        // repeats is that a repeat is one process.
-        saved.cases.removeAll { $0.repeatIndex == saved.repeatIndex }
+        // A repeat that was interrupted **part-way** is dropped rather than stitched onto this
+        // one: its cases were measured in a process that is gone, and the point of restarting
+        // between repeats is that a repeat is one process.
+        //
+        // A repeat with nothing left to measure is a different thing and must not be dropped. Its
+        // index has not advanced only because the process was replaced during the cooldown that
+        // follows the last case — which is exactly when an operator relaunches, having seen the
+        // ninth case appear in the file. On 14 September 2026 that discarded a complete repeat and
+        // looked from outside like a normal start.
+        if !saved.remaining.isEmpty {
+            saved.cases.removeAll { $0.repeatIndex == saved.repeatIndex }
+        }
         plan = saved
         storage.save(saved)
         beginNextCase()
