@@ -70,6 +70,30 @@ The demo's Xcode project is generated from `Demo/project.yml` by XcodeGen and is
 SwiftPM has no product type for an iOS application, but a checked-in project file merges badly and
 drifts from the manifest unnoticed.
 
+## Why nine Apple-stack methods and no third-party library
+
+The usual first question, and the answer differs by the class of library rather than by the
+library.
+
+**Wrappers around Core Graphics** — DGCharts is the well-known one: Apache 2.0, minimum iOS 12,
+both read off its own `LICENSE` and `Package.swift`. It draws its own chrome and applies its own
+reduction, so a chart it produces is not the chart the other nine produce and the equivalence check
+here has nothing to compare. That is not a criticism of it. It is a product with opinions, and this
+is a bench that holds everything constant but the drawing.
+
+**Wrappers around a JavaScript library in a web view** — AAChartKit-Swift is one: `AAChartView` is
+a `WKWebView`, updated by handing it a string through `evaluateJavaScript`, which its source says
+plainly. The frame is then drawn by the WebKit process. `DisplayLinkTicker` cannot see that process
+and nothing in this package can time it, so a row for it would be a row of absences.
+
+**Commercial engines** ship no source, so a reader cannot check what was drawn or what was skipped
+— and whether their licences permit publishing timings at all is a question this project has not
+answered. An unread licence is reason enough not to publish a number under it.
+
+What that leaves out is a load-bearing comparison: how these nine stand against a mature library
+anyone can install. That is worth having, and it belongs on its own axis — outside the equivalence
+table and labelled as not equivalent — rather than as a tenth row pretending to be one of these.
+
 ## What this does NOT do (yet)
 
 All nine backends draw the one reference chart RC-1, and only four of its fifteen required
