@@ -125,4 +125,10 @@ result.
 
 ## Licence
 
-MIT — see [`LICENSE`](LICENSE).
+MIT — see [`LICENSE`](LICENSE) — with one exception a reader who vendors this needs to know about.
+
+The demo bundles six IBM Plex faces under the SIL Open Font License, whose text travels with them
+in [`Demo/Resources/Fonts/OFL.txt`](Demo/Resources/Fonts/OFL.txt). The OFL is not MIT: it carries
+its own conditions on redistribution and on reserved names. Nothing in the Swift package depends on
+those files — they belong to the demo application alone — so a dependency taken on `RenderBench` is
+MIT and nothing else.
